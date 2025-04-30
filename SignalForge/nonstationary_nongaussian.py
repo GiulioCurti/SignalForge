@@ -3,8 +3,8 @@ import scipy as sp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from utils import *
-from single_chan_signal import SingleChanSignal
+from .utils import *
+from .single_chan_signal import SingleChanSignal
 
 '''
 supporting functions / 'static methods' (no need of self object)
@@ -323,6 +323,7 @@ class NonStationaryNonGaussian(SingleChanSignal):
         fpsd (np.ndarray): Frequency vector for the input PSD.
         psd (np.ndarray): Power spectral density values.
         T (float): Total duration of the signal [s].
+        fs (float, optional): Wanted sampling frequency. If None -> 2*fpsd[-1]
         dfpsd (float, optional): Frequency resolution [Hz]. Default is 0.5.
         method (str, optional): Modulation method: 'beta_am', 'ray_am', 'trapp_am', or 'fm'. Default is 'beta_am'.
         params (dict, optional): Dictionary of parameters for the modulation method.
@@ -337,6 +338,7 @@ class NonStationaryNonGaussian(SingleChanSignal):
         fpsd:np.ndarray, 
         psd:np.ndarray, 
         T:float, 
+        fs:float = None,
         dfpsd:float = 0.5, 
         method:str = 'beta_am', 
         params = None, 
@@ -353,11 +355,15 @@ class NonStationaryNonGaussian(SingleChanSignal):
         
         method_existance_check(interp, interps)
         
+        if fs is None: 
+            self.fs = fpsd[-1] * 2  # Nyquist frequency
+        else:
+            self.fs = fs
+        
         if len(fpsd)!=len(psd):
             raise AttributeError('The frequency vector and the PSD vector are not the same size.')
         self.dfpsd = dfpsd
-        self.fpsd,self.psd = interps[interp](fpsd, psd, n_points = int(fpsd[-1]/dfpsd)) 
-        self.fs = 2*self.fpsd[-1]
+        self.fpsd,self.psd = interps[interp](fpsd, psd, n_points = int(fpsd[-1]/dfpsd), fs = self.fs) 
         self.T = T
         self.x, self.carrier = self._get_nonstationary_timehistory(method = method, params = params, seed_gauss = seed)
         self.signal_type = f'Nonstationary - NonGaussian ({method})'

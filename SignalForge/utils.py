@@ -39,7 +39,7 @@ def step_interp(x, xp, yp):
     idx = np.clip(idx, 0, len(yp)-1)
     return y[idx]
 
-def lin_interp_psd(fpsd:np.ndarray, psd:np.ndarray, n_points:int): 
+def lin_interp_psd(fpsd:np.ndarray, psd:np.ndarray, n_points:int, fs = None): 
     """
     Linear interpolation of a PSD to a uniformly spaced frequency grid.
 
@@ -51,12 +51,14 @@ def lin_interp_psd(fpsd:np.ndarray, psd:np.ndarray, n_points:int):
     Returns:
         tuple: (interpolated frequency vector, interpolated PSD)
     """
-    new_fpsd = np.linspace(0,1,round(n_points))*fpsd[-1]
-    new_psd = np.interp(new_fpsd, fpsd, psd)
+    if fs is None: 
+        fs = fpsd[-1] * 2
+    new_fpsd = np.linspace(0,1,round(n_points))*fs/2
+    new_psd = np.interp(new_fpsd, fpsd, psd, left=0, right=0)
     new_psd[0] = 0
     return new_fpsd, new_psd 
 
-def log_interp_psd(fpsd, psd, n_points): #!FIX: FIX BEHAVIOR
+def log_interp_psd(fpsd, psd, n_points, fs = None):
     """
     Log-log interpolation of a PSD to a uniformly spaced frequency grid.
 
@@ -68,11 +70,15 @@ def log_interp_psd(fpsd, psd, n_points): #!FIX: FIX BEHAVIOR
     Returns:
         tuple: (interpolated frequency vector, interpolated PSD)
     """
+    if fs is None: 
+        fs = fpsd[-1] * 2
+    psd = psd.astype('float')
     psd[psd<=0]= 1e-30
-    interp_log = sp.interpolate.interp1d(np.log10(fpsd), np.log10(psd), kind='linear', fill_value='extrapolate')
-    new_fpsd = np.linspace(0,1,n_points)*fpsd[-1]
-    new_psd = 10**interp_log(np.log10(new_fpsd))
+    new_fpsd = np.linspace(0,1,round(n_points))*fs/2
+    new_psd = np.interp(np.log10(new_fpsd), np.log10(fpsd), np.log10(psd), left=-30, right=-30)
+    new_psd = 10**new_psd
     new_psd[new_psd<=1e-30]= 0
+    new_psd[0] = 0
     return new_fpsd, new_psd
     
 def get_stat_mom(var, probability, order):
@@ -107,7 +113,7 @@ def alpha_spec_index(fpsd, psd, order, deriv_order):
     m2n_2x = get_stat_mom(fpsd, psd, 2*(deriv_order+order))
     return m2n_x/np.sqrt(m2n*m2n_2x)
 
-def get_psd_impulse_response(fpsd,psd, N):
+def get_psd_impulse_response(fpsd,psd, N, fs = None):
     """
     Compute an impulse response from a target PSD.
 
@@ -119,11 +125,13 @@ def get_psd_impulse_response(fpsd,psd, N):
     Returns:
         np.ndarray: Time-domain impulse response.
     """
+    if fs is None: 
+        fs = fpsd[-1] * 2
     N_os = (N // 2 + 1)
-    _, psd_interp = lin_interp_psd(fpsd, psd, N_os)
-    T = N/(2*fpsd[-1])
+    _, psd_interp = lin_interp_psd(fpsd, psd,fs, N_os)
+    T = N/(fs)
     freq_filter = psd_interp*T*fpsd[1]
-    h_t = np.fft.irfft((np.sqrt(freq_filter)), n = N)*fpsd[-1]*2
+    h_t = np.fft.irfft((np.sqrt(freq_filter)), n = N)*fs
     h_t = np.roll(h_t, N//2) # circular shift to make the impulse centred
     return h_t
 
@@ -201,7 +209,7 @@ def get_banded_spectral_kurtosis(
         SK[i] = sp.stats.kurtosis(x)+3    
     return fvec, SK
 
-def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = 0):
+def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = None):
     """
     Compute Welch-based spectral kurtosis.
 
@@ -216,6 +224,9 @@ def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = 0):
     Source:
     J. Antoni, «The spectral kurtosis: a useful tool for characterising non-stationary signals», Mech. Syst. Signal Process., vol. 20, fasc. 2, pp. 282–307, feb. 2006, doi: 10.1016/j.ymssp.2004.09.001.
     """
+    if noverlap is None:
+        noverlap = Nfft//2
+    
     # Convert scalar window input to actual window
     Window = sp.signal.windows.hann(Nfft//2)
     
@@ -258,7 +269,7 @@ def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = 0):
 
     return f_norm[:Nfft//2], SK[:Nfft//2]
 
-def get_stationary_gaussian(fpsd:np.ndarray, psd:np.ndarray, T:float, seed = None):
+def get_stationary_gaussian(fpsd:np.ndarray, psd:np.ndarray, T:float, fs:float = None, seed = None, interp:str = 'lin'):
     """
     Generate a stationary Gaussian signal with a target PSD.
 
@@ -279,21 +290,29 @@ def get_stationary_gaussian(fpsd:np.ndarray, psd:np.ndarray, T:float, seed = Non
 
     psd[np.isnan(psd)] = 0
 
-    fs = fpsd[-1] * 2
+    if fs is None: 
+        fs = fpsd[-1] * 2
+    
     N = int(fs * T)
 
     N_os = N // 2 + 1
 
     # Ensure zero-frequency component exists
-    if fpsd[0] != 0:
-        fpsd = np.concatenate(([0], fpsd))
-        fpsd = np.concatenate(([0], psd))
+    # if fpsd[0] != 0:
+    #     fpsd = np.concatenate(([0], fpsd))
+    #     fpsd = np.concatenate(([0], psd))
 
-    fvec = np.linspace(0, fs // 2, N_os)
+    # fvec = np.linspace(0, fs // 2, N_os)
     mue2 = np.trapz(psd, fpsd)
 
     # Interpolate PSD onto frequency vector
-    per = np.interp(fvec, fpsd, psd)
+    interpolators ={
+        'lin':lin_interp_psd,
+        'log':log_interp_psd
+    }
+    method_existance_check(interp, interpolators)
+    # per = np.interp(fvec, fpsd, psd)
+    fper, per = interpolators[interp](fpsd, psd, N_os, fs)
     per = mue2 / (np.sum(per / T)) * per  # Equivalent to dfpsd * inp['T'] * per
 
     # Generate random phase and magnitude

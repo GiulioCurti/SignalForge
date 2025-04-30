@@ -1,5 +1,6 @@
-__version__ = '0.1'
-from SignalForge.single_chan_signal import *
-from SignalForge.stationary_gaussian import *
-from SignalForge.stationary_nongaussian import *
-from SignalForge.nonstationary_nongaussian import *
+__version__ = '0.0.1'
+from .single_chan_signal import *
+from .stationary_gaussian import *
+from .stationary_nongaussian import *
+from .nonstationary_nongaussian import *
+from .utils import *

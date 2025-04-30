@@ -2,8 +2,8 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 
-from utils import *
-from single_chan_signal import SingleChanSignal
+from .utils import *
+from .single_chan_signal import SingleChanSignal
 
 
 '''
@@ -51,7 +51,7 @@ def get_winterstein(
     signal: np.ndarray,
     input_skewness: float,
     input_kurtosis: float,
-    params: dict = {'order': 3}
+    params: float = None
 ) -> tuple:
     """
     Applies the Winterstein method to generate a non-Gaussian signal
@@ -65,9 +65,9 @@ def get_winterstein(
             Desired skewness of the output signal.
         input_kurtosis (float):     
             Desired kurtosis of the output signal.
-        params (dict): 
+        params (float): 
             Optional dictionary of parameters. Currently supports:
-            - 'order': 2 or 3, for second or third order Winterstein transformation.
+            - 2 or 3, for second or third order Winterstein transformation.
 
     Returns
     ---------
@@ -94,7 +94,7 @@ def get_winterstein(
     x = signal / input_rms
 
     # Choose transformation order
-    if params.get('order', 3) == 2:
+    if params is not None and params == 2:
         print('Estimating Winterstein second order non-linear transform...')
         h_3 = S / (4 + 2 * np.sqrt(1 + 1.5 * (K - 3)))
         h_4 = (np.sqrt(1 + 1.5 * (K - 3)) - 1) / 18
@@ -126,7 +126,7 @@ def get_winterstein(
     opt_params = None
     return ng_signal, opt_params
 
-def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None): 
+def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None): 
     """
     Applies a cubic polynomial transformation to a signal to match specified skewness and kurtosis.
 
@@ -195,7 +195,7 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
     opt_params = {'a': optim_res.x}
     return ng_signal, opt_params
 
-def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None):
+def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None):
     """
     Applies Zheng's transformation to achieve a desired kurtosis and skewness.
 
@@ -268,10 +268,10 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = No
     ng_signal = transform_function(x, a, b)    
     output_rms = np.std(ng_signal)
     ng_signal = ng_signal*(input_rms/output_rms) # bring back rms to original value
-    opt_params = {'a': optim_res.x[0], 'b': optim_res.x[1]}
+    opt_params = {'a': a, 'b': b}
     return ng_signal, opt_params
     
-def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None): 
+def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None): 
     """
     Applies Sarkani's transformation to achieve a desired kurtosis and skewness.
 
@@ -292,9 +292,9 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
     ------
     S. Sarkani, D. P. Kihl, e J. E. Beach, «Fatigue of welded joints under narrowband non-Gaussian loadings», Probabilistic Eng. Mech., vol. 9, fasc. 3, pp. 179–190, gen. 1994, doi: 10.1016/0266-8920(94)90003-5.
     """
-    def sarkani_transform(x, beta, n):
+    def sarkani_transform(x, b1, b2):
         """Sarkani's nonlinear transformation."""
-        return np.exp(beta*x)-np.exp(-n*x)
+        return x + b1*np.sign(x)*np.abs(x)**b2
     
     ## * OBJECTIVE FUNCTION WITH TIMEHISTORY
     # def sarkani_time_obj_fun(var):
@@ -312,9 +312,9 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
         nonlocal x,input_rms, grid, pdf_x, input_kurtosis
-        beta = var[0]
-        n = var[1]
-        z = sarkani_transform(grid, beta, n)
+        b1 = var[0]
+        b2 = var[1]
+        z = sarkani_transform(grid, b1, b2)
         
         ## * FOR EQUIVALENCE TO TIMESERIES TEST
         # zt = sarkani_transform(x, beta, n)
@@ -329,15 +329,15 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
 
     x = signal
     input_rms, grid, pdf_x = _get_signal_statistics(x)
-    optim_res = sp.optimize.minimize(sarkani_obj_fun, x0=[2, 2], bounds=[(0, 5), (0, 5)])
-    beta = optim_res.x[0]
-    n = optim_res.x[1]
-    ng_signal = sarkani_transform(signal, beta, n)     
+    optim_res = sp.optimize.minimize(sarkani_obj_fun, x0=[2, 2], bounds=[(0, 5), (1, 5)])
+    b1 = optim_res.x[0]
+    b2 = optim_res.x[1]
+    ng_signal = sarkani_transform(signal, b1, b2)     
     ng_signal = ng_signal*(input_rms/np.std(ng_signal))
-    opt_params = {'beta': optim_res.x[0], 'n': optim_res.x[1]}
+    opt_params = {'b1': optim_res.x[0], 'b2': optim_res.x[1]}
     return ng_signal, opt_params
 
-def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:float = None): 
+def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:float = None, params = None): 
     """
     Applies the improved non linear transformation to achieve a desired kurtosis.
 
@@ -404,7 +404,8 @@ def get_steinwolf(
     signal:np.ndarray, 
     fs:float, 
     input_kurtosis:float, 
-    input_skewness:float = None
+    input_skewness:float = None,
+    params = None
     ): #! FIX: INCONSISTENT AND WRONG RESULTS  
     """
     Applies the Steinwolf phase transformation to achieve a desired kurtosis.
@@ -512,7 +513,8 @@ def get_smallwood(
         T: float, 
         input_kurtosis: float, 
         input_skewness: float = None, 
-        seed: int = None
+        seed: int = None,
+        params = None
         ):# ! FIX: NOT WORKING 
     """
     Uses the Smallwood filtered poisson shot to achieve a desired kurtosis.
@@ -590,7 +592,8 @@ def get_vanbaren(
             T: float, 
             input_kurtosis: float, 
             input_skewness: float = None, 
-            seed: int = None
+            seed: int = None,
+            params = None
             ):
     """
     Uses the Vanbaren filtered poisson shot to achieve a desired kurtosis.
@@ -697,6 +700,7 @@ class StationaryNonGaussian(SingleChanSignal):
         psd: np.ndarray,
         T: float,
         kurtosis: int,
+        fs : float = None,
         dfpsd: float = 0.5,
         skewness: int = 0,
         method: str = 'winter',
@@ -718,14 +722,18 @@ class StationaryNonGaussian(SingleChanSignal):
 
         # Validate interpolation method
         method_existance_check(interp, interps)
-
+        self._interp = interp
+        
         if len(fpsd) != len(psd):
             raise AttributeError('The frequency and PSD vectors must have the same length.')
 
         self.fpsd = fpsd
         self.psd = psd
         self.T = T
-        self.fs = 2 * self.fpsd[-1]
+        if fs is None: 
+            self.fs = fpsd[-1] * 2  # Nyquist frequency
+        else:
+            self.fs = fs
 
         # Generate the non-Gaussian signal
         self.transform_params, self.x = self._get_nongaussian_timehistory(
@@ -756,7 +764,7 @@ class StationaryNonGaussian(SingleChanSignal):
         Returns:
             np.ndarray: The generated Gaussian signal.
         """
-        _, signal = get_stationary_gaussian(self.fpsd, self.psd, self.T, seed)
+        _, signal = get_stationary_gaussian(self.fpsd, self.psd, self.T, fs = self.fs, seed = seed, interp= self._interp)
         return signal
 
     def _get_nongaussian_timehistory(

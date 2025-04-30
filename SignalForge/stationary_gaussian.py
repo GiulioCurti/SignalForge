@@ -2,8 +2,8 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 
-from utils import *
-from single_chan_signal import SingleChanSignal
+from .utils import *
+from .single_chan_signal import SingleChanSignal
 
 
 class StationaryGaussian(SingleChanSignal):
@@ -38,6 +38,7 @@ class StationaryGaussian(SingleChanSignal):
         fpsd: np.ndarray,
         psd: np.ndarray,
         T: float,
+        fs : float = None,
         dfpsd: float = 0.5,
         name: str = "",
         var: str = "x",
@@ -45,16 +46,6 @@ class StationaryGaussian(SingleChanSignal):
         seed: int = None,
         interp: str = "lin"
     ):
-        interp = interp.lower()
-
-        # Dictionary of available interpolation functions
-        interps = {
-            'lin': lin_interp_psd,
-            'log': log_interp_psd
-        }
-
-        # Validate interpolation method
-        method_existance_check(interp, interps)
 
         # Check input dimensions
         if len(fpsd) != len(psd):
@@ -63,11 +54,14 @@ class StationaryGaussian(SingleChanSignal):
             )
 
         # Set internal parameters
-        self.fs = 2 * fpsd[-1]  # Nyquist frequency
+        if fs is None: 
+            self.fs = fpsd[-1] * 2  # Nyquist frequency
+        else:
+            self.fs = fs
         self.T = T
 
         # Generate time-domain Gaussian signal
-        self.x = self._get_timehistory(fpsd, psd, seed)
+        self.x = self._get_timehistory(fpsd, psd, self.fs, seed, interp)
 
         self.signal_type = 'Stationary - Gaussian'
 
@@ -86,7 +80,9 @@ class StationaryGaussian(SingleChanSignal):
         self,
         fpsd: np.ndarray,
         psd: np.ndarray,
-        seed: int = None
+        fs: float,
+        seed: int = None,
+        interp: str = 'lin'
     ) -> np.ndarray:
         """
         Generates a Gaussian time history from the given PSD.
@@ -106,9 +102,9 @@ class StationaryGaussian(SingleChanSignal):
         np.ndarray
             Time-domain Gaussian signal.
         """
-        _, signal = get_stationary_gaussian(fpsd, psd, self.T, seed)
+        _, signal = get_stationary_gaussian(fpsd, psd, self.T,fs, seed, interp)
         return signal
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":   
     pass

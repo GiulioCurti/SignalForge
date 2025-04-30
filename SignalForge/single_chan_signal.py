@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pywt
 
 
-from utils import *
+from .utils import *
 
 
 class SingleChanSignal:
@@ -115,10 +115,10 @@ class SingleChanSignal:
             if not np.allclose(self.t, other.t):
                 raise ValueError("Cannot add signals: time vectors are not aligned.")
 
-            return SingleChanSignal(x=self.x + other.x, t=self.t)
+            return SingleChanSignal(x=self.x + other.x, fs=self.fs)
 
         elif isinstance(other, (int, float)):
-            return SingleChanSignal(x=self.x + other, t=self.t)
+            return SingleChanSignal(x=self.x + other, fs=self.fs)
 
         else:
             raise TypeError(f"Unsupported operand type(s) for +: 'SingleChanSignal' and '{type(other).__name__}'")
@@ -195,7 +195,7 @@ class SingleChanSignal:
         smoms['v0']   = np.sqrt(smoms['smom2']/smoms['smom0'])
         smoms['vp']   = np.sqrt(smoms['smom4']/smoms['smom2'])
         smoms['vm']   = smoms['smom1']/smoms['smom0']
-        smoms['xm'] = smoms['v_m']/ smoms['v_p']
+        smoms['xm'] = smoms['vm']/ smoms['vp']
         smoms['alpha1'] = alpha_spec_index(self.fpsd, self.psd, 1, 0)
         smoms['alpha2'] = alpha_spec_index(self.fpsd, self.psd, 2, 0)
         smoms['alpha075'] = alpha_spec_index(self.fpsd, self.psd, .75, 0)
