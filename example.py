@@ -1,6 +1,3 @@
-import matplotlib.pyplot as plt
-import numpy as np
-
 ## STATIONARY GAUSSIAN GENERATION
 from SignalForge.stationary_gaussian import StationaryGaussian
 
@@ -65,5 +62,3 @@ print(nonstat_signal)
 nonstat_signal.plot()      # Plotting Timehistory
 nonstat_signal.plot_psd()  # Plotting Timehistory
 nonstat_signal.plot_sftf()  # Plotting Short Time Fourier Transform
-
-plt.show(block = True)
