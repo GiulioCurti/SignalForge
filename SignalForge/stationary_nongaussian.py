@@ -395,7 +395,7 @@ def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:f
     optim_res = sp.optimize.minimize(zmnl_obj_fun, x0=[2, 2], bounds=[(0, 5), (0, 5)])
     beta = optim_res.x[0]
     n = optim_res.x[1]
-    ng_signal = zengh_transform(signal, beta, n)     
+    ng_signal = zengh_transform(signal, beta, n, fs)     
     ng_signal = ng_signal*(input_rms/np.std(ng_signal))
     opt_params = {'beta': optim_res.x[0], 'n': optim_res.x[1]}
     return ng_signal, opt_params
