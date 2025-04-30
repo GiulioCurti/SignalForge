@@ -2,6 +2,7 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import pywt
+import os
 
 
 from .utils import *
@@ -918,6 +919,26 @@ class SingleChanSignal:
         plt.show(block=False)
         return ax
 
+    def save_to_csv(self, filename: str):
+        """
+        Save the signal time history to a CSV file using numpy.savetxt.
+
+        Parameters
+        ----------
+        filename : str
+            Full path (or filename) where the CSV will be saved.
+        """
+        # Stack time and signal into two columns
+        data = np.column_stack((self.t, self.x))
+
+        # Ensure directory exists if specified
+        if os.path.dirname(filename):
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        # Save to CSV
+        np.savetxt(filename, data, delimiter=",")
+
+        print(f"Signal saved to '{filename}' successfully.")
         
 if __name__ == "__main__":
     pass
