@@ -9,7 +9,7 @@ Example code on how to generate a Stationary Gaussian Signal
 Stationary Gaussian signals can be easily generated via the specific class StationaryGaussian. Its usage is briefly shown in the following example code:
 
 ```python
-from SignalForge.stationary_gaussian import StationaryGaussian
+from SignalForge import StationaryGaussian
 
 fpsd = [10,20]  # Frequency vector [Hz]
 psd = [1,1]     # Power density vecrtor [(m/s^2)^2/Hz]
@@ -44,7 +44,7 @@ Example code on how to generate a Stationary Non Gaussian Signal
 Stationary non Gaussian signals can be easily generated via the specific class StationaryNonGaussian. Its usage is briefly shown in the following example code:
 
 ```python
-from SignalForge.stationary_nongaussian import StationaryNonGaussian
+from SignalForge import StationaryNonGaussian
 
 fpsd = [10,20]  # Frequency vector [Hz]
 psd = [1,1]     # Power density vecrtor [(m/s^2)^2/Hz]
@@ -73,7 +73,7 @@ Example code on how to generate a Non Stationary Non Gaussian Signal
 Non stationary non Gaussian signals can be easily generated via the specific class NonStationaryGaussian. Its usage is briefly shown in the following example code:
 
 ```python
-from SignalForge.nonstationary_nongaussian import NonStationaryNonGaussian
+from SignalForge import NonStationaryNonGaussian
 
 fpsd = [10,20]  # Frequency vector [Hz]
 psd = [1,1]     # Power density vecrtor [(m/s^2)^2/Hz]

@@ -157,7 +157,9 @@ def get_nonstat_index(signal, winsize:int, idx_type = 'kurtosis'):
     
     method_existance_check(idx_type, idx_types)
     
-    idx_history = np.zeros((len(signal) - winsize + 1,))
+    winsize = int(np.round(winsize))
+    
+    idx_history = np.zeros((len(signal) - winsize + 1))
     
     print(f'Calculating {idx_type} evolution')
     k = 0
@@ -259,7 +261,7 @@ def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = None):
     M4 /= k
     M2 /= k
     SK = M4 / (M2**2) - 2
-
+    
     # Bias correction
     W = np.abs(np.fft.fft(Window**2, Nfft))**2
     Wb = np.array([W[(2*i) % Nfft] / W[0] for i in range(Nfft)])

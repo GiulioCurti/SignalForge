@@ -48,9 +48,9 @@ class SingleChanSignal:
         self.signal_type = signal_type
             
         print('Estimating statistical parameters from timehistory')
-        self.x = x
+        self.x = np.matrix.flatten(np.array(x))
         self.mean = np.mean(self.x)
-        self.fs = fs
+        self.fs = float(fs)
         self.N = len(self.x)
         self.T = self.N/self.fs
         self.dt = 1/self.fs
@@ -59,26 +59,28 @@ class SingleChanSignal:
         
         self.central_moments = self._get_central_moments()
         self.spectral_moments = self._get_spectral_moments()
+        print('Class correctly initialized')
+        print(self)
         
-    def __print__(self):
+    def __str__(self):
         """
         Human-readable summary of the signal object.
         """
         return (
             f"SingleChanSignal Summary:\n"
             f"--------------------------\n"
-            f"Name         : {self.name} samples\n"
-            f"Type         : {self.signal_type} samples\n"
+            f"Name         : {self.name}\n"
+            f"Type         : {self.signal_type}\n"
             f"Length       : {self.N} samples\n"
             f"Duration     : {self.T:.2f} s\n"
             f"Sampling Rate: {self.fs:.2f} Hz\n"
             f"Mean         : {self.mean:.2f}\n"
-            f"Std. Dev.    : {self.central_moments['rms']:.2f}\n"
-            f"Skewness     : {self.central_moments['skew']:.2f}\n"
+            f"Std. Dev.    : {self.central_moments['rms']:.2f} {self.unit}\n"
+            f"Skewness     : {self.central_moments['skew']:.2f} {self.unit}\n"
             f"Kurtosis     : {self.central_moments['kurtosis']:.2f}\n"
-            f"Crest factor : {self.central_moments['kurtosis']:.2f}\n"
+            f"Crest factor : {self.central_moments['crest_factor']:.2f}\n"
             f"0-cross rate : {self.spectral_moments['v0']:.2f} Hz\n"
-            f"peak rate    : {self.spectral_moments['vp']:.2f} Hz"
+            f"Peak rate    : {self.spectral_moments['vp']:.2f} Hz"
         )
     
     def __repr__(self):
@@ -162,7 +164,7 @@ class SingleChanSignal:
         estimate power spectral density (PSD) 
         -> called by __init__
         '''
-        self.fpsd, self.psd = sp.signal.welch(self.x,self.fs,nperseg=round(self.fs/df), noverlap = noverlap)
+        self.fpsd, self.psd = sp.signal.welch(self.x,self.fs,nperseg=np.round(self.fs/df), noverlap = noverlap)
         return self.fpsd, self.psd 
     
     def _get_central_moments(self):
@@ -344,7 +346,7 @@ class SingleChanSignal:
         f : ndarray
             Frequencies corresponding to wavelet scales.
         """
-        print(f'Calculating continuyous wavelet transform with "{wavelet}" wave')
+        print(f'Calculating continuyous wavelet transform with "{wavetype}" wave')
         wavelet = pywt.ContinuousWavelet(wavetype)
         scales = pywt.central_frequency(wavelet) * self.fs / np.arange(10, 150, 1)
         data, f =  pywt.cwt(self.x, scales, wavelet, sampling_period= 1/self.fs, **kwargs)
@@ -415,7 +417,10 @@ class SingleChanSignal:
         """
         print(f'Calculating Kurtogram')
         np_freqs = self.N//2
-        n_divisions = np.arange(*n_bins)
+        try:
+            n_divisions = np.arange(*n_bins)
+        except:
+            raise ValueError('n_bins argument does not meet requirement. Try with a tuple with np.arange() format "(start, finish, step)"')
         max_Nfft = np_freqs//np.min(n_divisions)
         ref_fvec = np.linspace(0,1,max_Nfft)*self.fs/2
         kurtogram = np.zeros((max_Nfft,len(n_divisions)))
@@ -438,7 +443,7 @@ class SingleChanSignal:
         ylims:list= None
         ):
         """
-        Plot the time histo\ry of the signal.
+        Plot the time history of the signal.
 
         Parameters
         ----------
@@ -495,17 +500,17 @@ class SingleChanSignal:
         print(f"Plotting Probability densisy function of signal's points")
         if ax is None:
             _, ax = plt.subplots(figsize=(6, 4))
-        s_rms = self.central_moments['rms']
+        # s_rms = self.central_moments['rms']
         s_kurt = self.central_moments['kurtosis']
         grid, pdf = self.get_pdf()
         
-        label = f"Signal {self.name}: rms = {s_rms:.2f} [{self.unit}] | $kurt$ = {s_kurt:.2f} [-] "
+        label = f"{self.name}: $kurt$ = {s_kurt:.2f} [-] "
         
         ax.plot(grid, pdf,'k',label=label)
         
         if plot_gaussian_bestfit:
             grid_gauss, pdf_gauss = self.get_bestfit_gaussian_pdf(grid=grid)
-            ax.plot(grid_gauss, pdf_gauss, 'g', label="Best-fit Gaussian")
+            ax.plot(grid_gauss, pdf_gauss, 'r', label="Best-fit Gaussian")
             
         ax.set_xlabel(f"Amplitude [{self.unit}]")
         ax.set_ylabel(f"$PDF$ [-]")
@@ -516,7 +521,6 @@ class SingleChanSignal:
         if xlims is not None:
             ax.set_xlim(xlims)
         if log:
-            ax.set_xscale("log")
             ax.set_yscale("log") 
         plt.show(block=False)
         return ax
@@ -658,10 +662,11 @@ class SingleChanSignal:
         plt.show(block=False)
         return ax
     
-    def plot_sftf(
+    def plot_stft(
         self, 
         nperseg:int = 2**10, 
-        hop = 2**8):
+        hop = 2**8,
+        flims:list = None):
         """
         Plot the Short-Time Fourier Transform (STFT) of the signal.
 
@@ -690,7 +695,10 @@ class SingleChanSignal:
         im1 = ax.imshow(abs(Sx), origin='lower', aspect='auto',
                         extent=SFT.extent(self.N))
         fig.colorbar(im1, label=f"Magnitude $|S_{self.var}(t, f)|$ [{self.unit}]")
+        if flims:
+            plt.ylim(flims)
         plt.show(block=False)
+
         return ax
     
     def plot_spectral_kurtosis(
@@ -713,7 +721,7 @@ class SingleChanSignal:
         ylims (list, optional): The limits for the y-axis.
 
         Returns
-        -------
+        -------h
         ax (matplotlib.axes.Axes): The axes with the plotted spectral kurtosis.
         """
         if n_bins and fl and fu: 
@@ -721,18 +729,19 @@ class SingleChanSignal:
         else: 
             fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = 2**10, noverlap = 2**8)
             
-        print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]:.1f} Hz')
+        print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs/2:.1f} Hz')
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 4))
         s_kur = self.central_moments['kurtosis']
-        label = f"$SK_{self.var}$(f): $kurt_g$ = {s_kur:.2f} [-]"
+        glob = 'global'
+        label = f"$SK_{self.var}$(f): $kurt_{{{glob}}}$ = {s_kur:.2f} [-]"
         ax.step(fvec*self.fs/2, spectral_kurtosis,'k',label=label, where = 'mid')
         ax.set_xlabel("frequency [Hz]")
         ax.set_ylabel(f"$SK_{self.var}$ [-]")
         ax.legend()   
         ax.grid(True,which = 'minor')
         ax.minorticks_on()  
-        ax.set_title('Spectral kurtosis ' + self.name)
+        ax.set_title('Spectral kurtosis ' + self.name + ' (0 = Gaussian)')
         ax.set_ylim([0,1.5*np.max(spectral_kurtosis)])
         if ylims is not None:
             ax.set_ylim(ylims)
@@ -762,19 +771,20 @@ class SingleChanSignal:
         ax (matplotlib.axes.Axes): 
             The axes with the plotted kurtogram.
         """      
-        kurtogram, n_divisions, max_Nfft = self.get_kurtogram(self, n_bins = (10,100,10), _plot_call = True)
+        kurtogram, n_divisions, max_Nfft = self.get_kurtogram(n_bins = n_bins, _plot_call = True)
         print(f'Plotting Kurtogram')
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 4), tight_layout=True)
         freq_edges = np.linspace(0, self.fs / 2, max_Nfft + 1)
         band_edges = np.append(n_divisions, n_divisions[-1] + (n_divisions[1] - n_divisions[0]))
-        mesh = ax.pcolormesh(freq_edges, np.flip(band_edges), kurtogram.T, shading='auto')
+        FE, BE = np.meshgrid(np.flip(band_edges), freq_edges)
+        mesh = ax.pcolormesh(BE, FE, kurtogram, shading='auto')
         plt.gca().invert_yaxis()
         cbar = fig.colorbar(mesh, ax = ax)
         cbar.ax.set_ylabel('Spectral kurtosis')
         ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel('Band')
-        ax.set_title(f'Kurtogram via STFT {self.name}')
+        ax.set_ylabel('Number of bands')
+        ax.set_title(f'Kurtogram {self.name}')
         if ylims is not None:
             ax.set_ylim(ylims)
         plt.show(block=False)
