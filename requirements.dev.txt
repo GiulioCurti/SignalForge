@@ -1,0 +1,5 @@
+# Package requirements for developers
+-r requirements.txt
+sphinx
+pytest
+sphinx-rtd-theme
