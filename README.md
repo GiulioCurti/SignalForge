@@ -1,4 +1,4 @@
-|Docs Status|
+[![Documentation Status](https://signalforge.readthedocs.io/en/latest/)](https://app.readthedocs.org/projects/signalforge/badge/)
 
 SignalForge
 -----------
@@ -108,5 +108,3 @@ Implemented transformartion methods to build non-gaussianity signals are the fol
 
 
 
-.. |Docs Status| image:: https://app.readthedocs.org/projects/signalforge/badge/
-   :target: https://signalforge.readthedocs.io/en/latest/
