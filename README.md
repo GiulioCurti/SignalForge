@@ -1,4 +1,4 @@
-[![Documentation Status](https://signalforge.readthedocs.io/en/latest/)](https://app.readthedocs.org/projects/signalforge/badge/)
+[![Documentation Status](https://app.readthedocs.org/projects/signalforge/badge/?version=latest)](https://signalforge.readthedocs.io/en/latest/)
 
 SignalForge
 -----------
