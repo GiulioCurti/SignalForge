@@ -81,15 +81,24 @@ def get_beta_amplitude_modulation(
 
     Parameters
     ----------
-        gauss_signal (array-like): Input Gaussian signal.
-        T (float): Signal duration in seconds.
-        input_kurtosis (float or array-like): Desired kurtosis of the output signal.
-        flims (tuple, optional): Frequency limits for banded modulation.
-        seed (int, optional): Seed for random number generation.
+        gauss_signal : array-like 
+            Input Gaussian signal.
+        T : float
+            Signal duration in seconds.
+        input_kurtosis : float or array-like 
+            Desired kurtosis of the output signal.
+        flims : tuple, optional 
+            Frequency limits for banded modulation.
+        seed : int, optional 
+            Seed for random number generation.
 
     Returns
     -------
-        tuple: (Modulated signal, carrier information dictionary)
+        nonstat_signal : np.ndarray
+            Non stationary resulting signal
+        carrier : dict
+            Dictionary containing "name" of carrier and "carrier" time history 
+        
     
     Source
     ------
@@ -100,13 +109,18 @@ def get_beta_amplitude_modulation(
         Generate a beta-distributed amplitude modulation carrier.
 
         Parameters:
-            alpha (float): Shape parameter for the beta distribution.
-            Ntw (int): Number of time windows.
-            time_vector (array-like): Time axis for the signal.
-            seed (int, optional): Seed for reproducibility.
+            alpha : float 
+                Shape parameter for the beta distribution.
+            Ntw : int 
+                Number of time windows.
+            time_vector : array-like 
+                Time axis for the signal.
+            seed : int, optional 
+                Seed for reproducibility.
 
         Returns:
-            array-like: Normalized amplitude modulation carrier.
+            carrier : array-like 
+                Normalized amplitude modulation carrier.
         """   
         beta = alpha
         t_mod = np.linspace(0,max(time_vector), round(Ntw))
@@ -153,15 +167,23 @@ def get_rayleigh_amplitude_modulation(
 
     Parameters
     ----------
-        gauss_signal (array-like): Input Gaussian signal.
-        T (float): Signal duration in seconds.
-        input_kurtosis (float or array-like): Desired kurtosis of the output signal.
-        flims (tuple, optional): Frequency limits for banded modulation.
-        seed (int, optional): Seed for random number generation.
+        gauss_signal : array-like
+            Input Gaussian signal.
+        T : float 
+            Signal duration in seconds.
+        input_kurtosis : float or array-like 
+            Desired kurtosis of the output signal.
+        flims : tuple, optional
+            Frequency limits for banded modulation.
+        seed : int, optional    
+            Seed for random number generation.
 
     Returns
     -------
-        tuple: (Modulated signal, carrier information dictionary)
+        nonstat_signal : np.ndarray
+            Non stationary resulting signal
+        carrier : dict
+            Dictionary containing "name" of carrier and "carrier" time history 
         
     Source
     ------
@@ -172,13 +194,18 @@ def get_rayleigh_amplitude_modulation(
         Generate a Rayleigh-distributed amplitude modulation carrier.
 
         Parameters:
-            sigma (float): Scale parameter of the Rayleigh distribution.
-            Ntw (int): Number of time windows.
-            time_vector (array-like): Time axis for the signal.
-            seed (int, optional): Seed for reproducibility.
+            sigma : float 
+                Scale parameter of the Rayleigh distribution.
+            Ntw : int 
+                Number of time windows.
+            time_vector : array-like 
+                Time axis for the signal.
+            seed : int, optional 
+                Seed for reproducibility.
 
         Returns:
-            array-like: Normalized amplitude modulation carrier.
+            carrier : array-like 
+                Normalized amplitude modulation carrier.
         """
         t_mod = np.linspace(0,max(time_vector), round(Ntw))
         if seed: np.random.seed(seed=seed)
@@ -218,16 +245,23 @@ def get_trapp_amplitude_modulation(
 
     Parameters
     ----------
-        gauss_signal (array-like): Input Gaussian signal.
-        T (float): Duration in seconds.
-        input_kurtosis (float): Desired signal kurtosis.
-        flims (tuple, optional): Placeholder for banded modulation (not yet implemented).
-        seed (int, optional): Random seed for reproducibility.
+        gauss_signal : array-like 
+            Input Gaussian signal.
+        T : float 
+            Duration in seconds.
+        input_kurtosis : float 
+            Desired signal kurtosis.
+        flims : tuple, optional
+            Placeholder for banded modulation (not yet implemented).
+        seed : int, optional 
+            Random seed for reproducibility.
 
     Returns
     -------
-        tuple: (Modulated signal, carrier information dictionary)
-    
+        nonstat_signal : np.ndarray
+            Non stationary resulting signal
+        carrier : dict
+            Dictionary containing "name" of carrier and "carrier" time history     
     Source
     ------
     A. Trapp, M. J. Makua, e P. Wolfsteiner, «Fatigue assessment of amplitude-modulated non-stationary random vibration loading», Procedia Struct. Integr., vol. 17, pp. 379–386, 2019, doi: 10.1016/j.prostr.2019.08.050.
@@ -281,13 +315,19 @@ def get_frequency_modulation(
 
     Parameters
     ---------
-        Sx (np.ndarray): Input spectrogram (complex-valued).
-        SFT: Object with STFT/ISTFT functionality and attributes `delta_t`, `f`.
-        modulation_function (array-like): Frequency shift values over time.
+        Sx : np.ndarray 
+            Input spectrogram (complex-valued).
+        SFT : sp.signal.ShortTimeFFT
+            Object with STFT/ISTFT functionality and attributes `delta_t`, `f`.
+        modulation_function : array-like
+            Frequency shift values over time.
 
     Returns
     -------
-        tuple: (Time-domain modulated signal, carrier information dictionary)
+        nonstat_signal : np.ndarray
+            Non stationary resulting signal
+        carrier : dict
+            Dictionary containing "name" of carrier and "carrier" time history 
     Source
     ------
     M. Clerc e S. Mallat, «Estimating deformations of stationary processes», Ann. Stat., vol. 31, fasc. 6, dic. 2003, doi: 10.1214/aos/1074290327.
@@ -320,18 +360,30 @@ class NonStationaryNonGaussian(SingleChanSignal):
     NonStationaryNonGaussian is a child class of SingleChanSignal.
     
     Parameters:
-        fpsd (np.ndarray): Frequency vector for the input PSD.
-        psd (np.ndarray): Power spectral density values.
-        T (float): Total duration of the signal [s].
-        fs (float, optional): Wanted sampling frequency. If None -> 2*fpsd[-1]
-        dfpsd (float, optional): Frequency resolution [Hz]. Default is 0.5.
-        method (str, optional): Modulation method: 'beta_am', 'ray_am', 'trapp_am', or 'fm'. Default is 'beta_am'.
-        params (dict, optional): Dictionary of parameters for the modulation method.
-        name (str, optional): Name of the signal.
-        var (str, optional): Variable symbol, e.g., 'x'.
-        unit (str, optional): Signal unit. Default is '$m/s^2$'.
-        seed (int, optional): Random seed for reproducibility.
-        interp (str, optional): PSD interpolation method: 'lin' or 'log'. Default is 'lin'.
+        fpsd : np.ndarray 
+            Frequency vector for the input PSD.
+        psd : np.ndarray
+            Power spectral density values.
+        T : float
+            Total duration of the signal [s].
+        fs : float, optional 
+            Wanted sampling frequency. If None -> 2*fpsd[-1]
+        dfpsd : float, optional 
+            Frequency resolution [Hz]. Default is 0.5.
+        method : str, optional 
+            Modulation method: 'beta_am', 'ray_am', 'trapp_am', or 'fm'. Default is 'beta_am'.
+        params : dict, optional 
+            Dictionary of parameters for the modulation method.
+        name : str, optional 
+            Name of the signal.
+        var str, optional 
+            Variable symbol, e.g., 'x'.
+        unit : str, optional
+            Signal unit. Default is '$m/s^2$'.
+        seed : int, optional 
+            Random seed for reproducibility.
+        interp : str, optional 
+            PSD interpolation method: 'lin' or 'log'. Default is 'lin'.
     """
     def __init__(
         self, 
@@ -384,7 +436,8 @@ class NonStationaryNonGaussian(SingleChanSignal):
         Generate a stationary Gaussian signal from the given PSD.
 
         Returns:
-            np.ndarray: The generated Gaussian signal.
+            signal : np.ndarray 
+                The generated Gaussian signal.
         """
         _, signal = get_stationary_gaussian(self.fpsd, self.psd,self.T, seed)
         return signal
@@ -395,10 +448,14 @@ class NonStationaryNonGaussian(SingleChanSignal):
         Designes a non-stationary process based off the parameters and methods imposed by the user.
 
         Parameters:
-            params (dict): Parameters for the modulation method.
-            method (str, optional): Modulation method.
-            seed_gauss (int, optional): Seed for Gaussian signal.
-            seed_mod (int, optional): Seed for modulation carrier.
+            params : dict
+                Parameters for the modulation method.
+            method : str, optional 
+                Modulation method.
+            seed_gauss : int, optional 
+                Seed for Gaussian signal.
+            seed_mod : int, optional
+                Seed for modulation carrier.
     
         Returns:
             tuple: Non-stationary signal and modulation carrier info.
@@ -430,13 +487,17 @@ class NonStationaryNonGaussian(SingleChanSignal):
         Plot the modulation carrier used to transform the Gaussian signal.
         Parameters
         ----------
-            ax (matplotlib.axes.Axes, optional): Axis to plot on. Creates a new one if None.
-            ylims (tuple, optional): y-axis limits.
-            xlims (tuple, optional): x-axis limits.
+            ax : matplotlib.axes.Axes, optional
+                Axis to plot on. Creates a new one if None.
+            ylims : tuple, optional 
+                y-axis limits.
+            xlims : tuple, optional 
+                x-axis limits.
         
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted carrier.
+            ax : matplotlib.axes.Axes
+                The axes with the plotted carrier.
         """
         print(f'Plotting Timehistory')
         if ax is None:

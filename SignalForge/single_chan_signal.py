@@ -10,7 +10,7 @@ from .utils import *
 
 class SingleChanSignal:
     """
-    StationaryNonGaussian is a the parent class of StationaryGaussian, StationaryNonGaussian and NonStationaryNonGaussian.
+    SingleChanSignal is the parent class of StationaryGaussian, StationaryNonGaussian and NonStationaryNonGaussian.
     Advanced signal analisys class.
     
     Parameters
@@ -161,7 +161,7 @@ class SingleChanSignal:
 
     def get_psd(self,df = 0.5,noverlap=None):
         ''' 
-        estimate power spectral density (PSD) 
+        estimate power spectral density (PSD) using the Welch method 
         -> called by __init__
         '''
         self.fpsd, self.psd = sp.signal.welch(self.x,self.fs,nperseg=np.round(self.fs/df), noverlap = noverlap)
@@ -405,14 +405,14 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional):
+        ax : matplotlib.axes.Axes, optional
             The axes to plot on. If None, a new figure and axes are created.
-        n_bins (tuple, optional): 
+        n_bins : tuple, optional
             The range of bins to use for the kurtogram. (start, finish, step)
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): 
+        ax : matplotlib.axes.Axes
             The axes with the plotted kurtogram.
         """
         print(f'Calculating Kurtogram')
@@ -447,13 +447,17 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        xlims (list, optional): The limits for the x-axis.
-        ylims (list, optional): The limits for the y-axis.
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional 
+            The limits for the x-axis.
+        ylims : list, optional 
+            The limits for the y-axis.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted time history.
+        ax :  matplotlib.axes.Axes 
+            The axes with the plotted time history.
         """
         print(f'Plotting Timehistory')
         if ax is None:
@@ -488,14 +492,19 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        xlims (list, optional): The limits for the x-axis.
-        log (bool, optional): Whether to plot on a logarithmic scale.
-        plot_gaussian_bestfit (bool, optional): Whether to plot the best-fit Gaussian distribution.
+        ax : matplotlib.axes.Axes, optional 
+            The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional 
+            The limits for the x-axis.
+        log : bool, optional  
+            Whether to plot on a logarithmic scale.
+        plot_gaussian_bestfit: bool, optional 
+            Whether to plot the best-fit Gaussian distribution.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted PDF.
+        ax : matplotlib.axes.Axes 
+            The axes with the plotted PDF.
         """
         print(f"Plotting Probability densisy function of signal's points")
         if ax is None:
@@ -508,8 +517,8 @@ class SingleChanSignal:
         
         ax.plot(grid, pdf,'k',label=label)
         
+        grid_gauss, pdf_gauss = self.get_bestfit_gaussian_pdf(grid=grid) # estimating gaussian counterpart for limits
         if plot_gaussian_bestfit:
-            grid_gauss, pdf_gauss = self.get_bestfit_gaussian_pdf(grid=grid)
             ax.plot(grid_gauss, pdf_gauss, 'r', label="Best-fit Gaussian")
             
         ax.set_xlabel(f"Amplitude [{self.unit}]")
@@ -518,6 +527,7 @@ class SingleChanSignal:
         ax.grid(True,which = 'both')
         ax.minorticks_on()   
         ax.set_title(f'Probability Density Function {self.name}')
+        ax.ylim([np.min(pdf_gauss), 1.1*np.max([np.max(pdf_gauss), np.max(pdf)])])
         if xlims is not None:
             ax.set_xlim(xlims)
         if log:
@@ -536,13 +546,17 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        xlims (list, optional): The limits for the x-axis.
-        ylims (list, optional): The limits for the y-axis.
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional
+            The limits for the x-axis.
+        ylims : list, optional 
+            The limits for the y-axis.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted FT.
+        ax : matplotlib.axes.Axes 
+            The axes with the plotted FT.
         """
         print(f'Plotting Fourier Transform of the signal')
         
@@ -584,14 +598,19 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        xlims (list, optional): The limits for the x-axis.
-        ylims (list, optional): The limits for the y-axis.
-        log (str, optional): Specifies the logarithmic scale for x, y, or both axes.
+        ax : matplotlib.axes.Axes, optional 
+            The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional 
+            The limits for the x-axis.
+        ylims : list, optional 
+            The limits for the y-axis.
+        log : str, optional 
+            Specifies the logarithmic scale for x, y, or both axes.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted PSD.
+        ax : matplotlib.axes.Axes 
+            The axes with the plotted PSD.
         """
         print(f'Plotting Power spectral density')
         if ax is None:
@@ -632,15 +651,21 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        window (tuple, optional): The window type and parameter for the spectrogram.
-        nperseg (int, optional): The number of data points per segment for the spectrogram.
-        ylims (list, optional): The limits for the y-axis.
-        clims (list, optional): The color limits for the spectrogram.
+        ax : matplotlib.axes.Axes, optional 
+            The axes to plot on. If None, a new figure and axes are created.
+        window : tuple, optional 
+            The window type and parameter for the spectrogram.
+        nperseg : int, optional 
+            The number of data points per segment for the spectrogram.
+        ylims : list, optional 
+            The limits for the y-axis.
+        clims : list, optional 
+            The color limits for the spectrogram.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted spectrogram.
+        ax : matplotlib.axes.Axes 
+            The axes with the plotted spectrogram.
         """
         print(f'Calculating spectrogram')
         f, t, Sxx = sp.signal.spectrogram(self.x, fs = self.fs, window = window, nperseg = nperseg)       
@@ -672,12 +697,15 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        nperseg (int, optional): The number of data points per segment for the STFT.
-        hop (int, optional): The number of data points between segments.
+        nperseg : int, optional
+            The number of data points per segment for the STFT.
+        hop : int, optional 
+            The number of data points between segments.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted STFT.
+        ax : matplotlib.axes.Axes
+            The axes with the plotted STFT.
         """
         print(f'Calculating STFT')
         Sx, SFT = self.get_sftf(nperseg = nperseg, hop = hop, nargout=2)
@@ -714,15 +742,21 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        n_bins (int, optional): The number of bins for the spectral kurtosis calculation.
-        fl (int, optional): The lower frequency bound.
-        fu (int, optional): The upper frequency bound.
-        ylims (list, optional): The limits for the y-axis.
+        ax : matplotlib.axes.Axes, optional 
+            The axes to plot on. If None, a new figure and axes are created.
+        n_bins : int, optional 
+            The number of bins for the spectral kurtosis calculation.
+        fl : int, optional 
+            The lower frequency bound.
+        fu : int, optional 
+            The upper frequency bound.
+        ylims : list, optional 
+            The limits for the y-axis.
 
         Returns
-        -------h
-        ax (matplotlib.axes.Axes): The axes with the plotted spectral kurtosis.
+        -------
+        ax : matplotlib.axes.Axes 
+            The axes with the plotted spectral kurtosis.
         """
         if n_bins and fl and fu: 
             fvec, spectral_kurtosis = get_banded_spectral_kurtosis(self.x,self.dt,n_bins, fl, fu)
@@ -759,16 +793,16 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): 
+        ax : matplotlib.axes.Axes, optional
             The axes to plot on. If None, a new figure and axes are created.
-        n_bins (tuple, optional): 
+        n_bins : tuple, optional
             The range of bins to use for the kurtogram. (start, finish, step)
-        ylims (list, optional): 
+        ylims : list, optional 
             The limits for the y-axis.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): 
+        ax : matplotlib.axes.Axes 
             The axes with the plotted kurtogram.
         """      
         kurtogram, n_divisions, max_Nfft = self.get_kurtogram(n_bins = n_bins, _plot_call = True)
@@ -803,15 +837,21 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        winsize (int): The window size for the non-stationarity index calculation.
-        idx_type (str, optional): The type of index to calculate ('rms' or 'kurt').
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        xlims (list, optional): The limits for the x-axis.
-        ylims (list, optional): The limits for the y-axis.
+        winsize : int 
+            The window size for the non-stationarity index calculation.
+        idx_type : str, optional 
+            The type of index to calculate ('rms' or 'kurt').
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional
+            The limits for the x-axis.
+        ylims : list, optional
+            The limits for the y-axis.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted non-stationarity index.
+        ax :: matplotlib.axes.Axes 
+            The axes with the plotted non-stationarity index.
         """
         ns_index = self.get_nonstat_index(winsize=winsize, idx_type = idx_type)
         print(f'Plotting Non-stationarity index: idx_type = {idx_type}')
@@ -842,11 +882,13 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
+        ax : matplotlib.axes.Axes, optional 
+            The axes to plot on. If None, a new figure and axes are created.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted Hilbert transform.
+        ax : matplotlib.axes.Axes
+            The axes with the plotted Hilbert transform.
         """
         _, amplitude_envelope, instantaneous_phase = self.get_hilbert()
         print(f'Plotting Hilbert transform')
@@ -875,11 +917,13 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted Hilbert spectrum.
+        ax : matplotlib.axes.Axes
+            The axes with the plotted Hilbert spectrum.
         """
         _, amplitude_envelope, instantaneous_phase = self.get_hilbert()
         instantaneous_frequency = np.diff(instantaneous_phase,prepend=0) / (2*np.pi) * self.fs
@@ -907,13 +951,17 @@ class SingleChanSignal:
 
         Parameters
         ----------
-        ax (matplotlib.axes.Axes, optional): The axes to plot on. If None, a new figure and axes are created.
-        wavetype (str, optional): The type of wavelet to use for the transform.
-        **kwargs: Additional keyword arguments for wavelet transformation.
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        wavetype : str, optional
+            The type of wavelet to use for the transform.
+        **kwargs: 
+        Additional keyword arguments for wavelet transformation.
 
         Returns
         -------
-        ax (matplotlib.axes.Axes): The axes with the plotted scalogram.
+        ax : matplotlib.axes.Axes
+            The axes with the plotted scalogram.
         """
         data, f = self.get_wavelet_transform(wavetype=wavetype, **kwargs)
         magnitude = np.log10(np.abs(data)+1)

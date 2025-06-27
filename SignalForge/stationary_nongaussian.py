@@ -27,14 +27,17 @@ def _get_signal_statistics(signal: np.ndarray) -> tuple:
 
     Parameters
     ----------
-        signal (np.ndarray): Input signal array.
+        signal : np.ndarray
+            Input signal array.
 
     Returns
     ----------
-        tuple: A tuple containing:
-            - rms (float): Root mean square (standard deviation) of the signal.
-            - grid (np.ndarray): Grid over which the PDF is evaluated.
-            - pdf_x (np.ndarray): Bestfit Gaussian PDF values evaluated over the grid.
+        rms : float
+            Root mean square (standard deviation) of the signal.
+        grid : np.ndarray 
+            Grid over which the PDF is evaluated.
+        pdf_x : np.ndarray 
+            Bestfit Gaussian PDF values evaluated over the grid.
     """
     # Compute the root mean square (standard deviation) of the signal
     rms = np.std(signal)
@@ -59,21 +62,22 @@ def get_winterstein(
 
     Parameters
     ----------
-        signal (np.ndarray): 
+        signal : np.ndarray
             Input signal.
-        input_skewness (float): 
+        input_skewness : float 
             Desired skewness of the output signal.
-        input_kurtosis (float):     
+        input_kurtosis : float     
             Desired kurtosis of the output signal.
-        params (float): 
+        params : float
             Optional dictionary of parameters. Currently supports:
             - 2 or 3, for second or third order Winterstein transformation.
 
     Returns
     ---------
-        tuple: A tuple containing:
-            - ng_signal (np.ndarray): Transformed non-Gaussian signal.
-            - opt_params (None): Placeholder for compatibility (no optimization done here).
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
             
     Source
     ------
@@ -132,17 +136,19 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
 
     Parameters
     -------
-        signal (np.ndarray): 
+        signal : np.ndarray 
             Input Gaussian signal.
-        input_kurtosis (float): 
+        input_kurtosis : float 
             Target kurtosis.
-        input_skewness (float): 
+        input_skewness : float 
             Target skewness.
 
     Returns
     ------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and dictionary of optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ----------
     S. R. Winterstein, C. H. Lange, e S. Kumar, «Fitting: Subroutine to fit four-moment probability distributions to data», SAND--94-3039, 10123319, gen. 1995. doi: 10.2172/10123319.
@@ -210,8 +216,10 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = No
 
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     R. Zheng, H. Chen, e X. He, «Control Method for Multiple-Input Multiple-Output Non-Gaussian Random Vibration Test: MIMO Non-Gaussian Random Vibration Test», Packag. Technol. Sci., vol. 30, fasc. 7, pp. 331–345, lug. 2017, doi: 10.1002/pts.2303.
@@ -277,17 +285,19 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
 
     Parameters
     ----------
-        signal (np.ndarray): 
+        signal : np.ndarray
             Input Gaussian signal.
-        input_kurtosis (float): 
+        input_kurtosis : float 
             Target kurtosis.
-        input_skewness (float, optional): 
+        input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
 
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     S. Sarkani, D. P. Kihl, e J. E. Beach, «Fatigue of welded joints under narrowband non-Gaussian loadings», Probabilistic Eng. Mech., vol. 9, fasc. 3, pp. 179–190, gen. 1994, doi: 10.1016/0266-8920(94)90003-5.
@@ -343,19 +353,21 @@ def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:f
 
     Parameters
     ----------
-        signal (np.ndarray): 
+        signal : np.ndarray 
             Input Gaussian signal.
-        fs (float):
+        fs : float
             Sampling frequency of the signal     
-        input_kurtosis (float): 
+        input_kurtosis : float 
             Target kurtosis.
-        input_skewness (float, optional): 
+        input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
 
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     G. Wise, A. Traganitis, e J. Thomas, «The effect of a memoryless nonlinearity on the spectrum of a random process», IEEE Trans. Inf. Theory, vol. 23, fasc. 1, pp. 84–89, gen. 1977, doi: 10.1109/TIT.1977.1055658.
@@ -412,19 +424,21 @@ def get_steinwolf(
 
     Parameters
     ----------
-        signal (np.ndarray): 
+        signal : np.ndarray
             Input Gaussian signal.
-        fs (float):
+        fs : float
             Sampling frequency of the signal     
-        input_kurtosis (float): 
+        input_kurtosis : float 
             Target kurtosis.
-        input_skewness (float, optional): 
+        input_skewness : float, optional 
             Target skewness. If None, assumes symmetry.
 
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     A. Steinwolf, «Random vibration testing with kurtosis control by IFFT phase manipulation», Mech. Syst. Signal Process., vol. 28, pp. 561–573, apr. 2012, doi: 10.1016/j.ymssp.2011.11.001.
@@ -521,22 +535,25 @@ def get_smallwood(
 
     Parameters
     ----------
-        fpsd (np.ndarray): 
+        fpsd : np.ndarray 
             Frequency vector of the power spectral density
-        psd (np.ndarray):
+        psd : np.ndarray
             Power density vector of the power spectral density
-        T (float)
-        input_kurtosis (float): 
+        T : float
+            Time length of the final signal
+        input_kurtosis : float 
             Target kurtosis.
-        input_skewness (float, optional): 
+        input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
-        seed (int):
+        seed : int
             Seed for the random generator for the Poisson shot times and amplitudes.
             
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     D. O. Smallwood, «Generation of Stationary Non-Gaussian Time Histories with a Specified Cross-spectral Density», Shock Vib., vol. 4, fasc. 5–6, pp. 361–377, 1997, doi: 10.1155/1997/713593.
@@ -600,21 +617,24 @@ def get_vanbaren(
 
     Parameters
     ----------
-        fpsd (np.ndarray): 
+        fpsd : np.ndarray 
             Frequency vector of the power spectral density
-        psd (np.ndarray):
+        psd : np.ndarray
             Power density vector of the power spectral density
-        T (float)
-        input_kurtosis (float): 
+        T : float
+            Time length of the final signal
+        input_kurtosis : float
             Target kurtosis.
-        input_skewness (float, optional): 
+        input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
-        seed (int):
+        seed : int
             Seed for the random generator for the Poisson shot times and amplitudes.
     Returns
     -------
-        Tuple[np.ndarray, dict]: 
-            Transformed signal and optimal parameters.
+        ng_signal : np.ndarray 
+            Transformed signal
+        opt_params : dict
+            Dictionary of optimal parameters
     Source
     ------
     P. Van Baren, «System and method for simultaneously controlling spectrum and kurtosis of a random vibration», US20070185620
@@ -761,8 +781,12 @@ class StationaryNonGaussian(SingleChanSignal):
         Internal function called by __init__
         Generate a stationary Gaussian signal from the given PSD.
 
-        Returns:
-            np.ndarray: The generated Gaussian signal.
+        Returns
+        --------
+            opt_params : dict
+                Dictionary of optimal parameters
+            signal : np.ndarray 
+                Transformed signal
         """
         _, signal = get_stationary_gaussian(self.fpsd, self.psd, self.T, fs = self.fs, seed = seed, interp= self._interp)
         return signal
