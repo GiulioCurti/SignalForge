@@ -3,4 +3,3 @@
 sphinx
 pytest
 sphinx-rtd-theme
--e .
