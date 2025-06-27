@@ -1,3 +1,5 @@
+|Docs Status|
+
 SignalForge
 -----------
 
@@ -103,3 +105,8 @@ Implemented transformartion methods to build non-gaussianity signals are the fol
 -	Gaussian amplitude modulation ('trapp_am')
 -	Rayleigh amplitude modulation ('ray_am') 
 -	Frequency modulation via STFT ('fm')
+
+
+
+.. |Docs Status| image:: https://app.readthedocs.org/projects/signalforge/badge/
+   :target: https://signalforge.readthedocs.io/en/latest/
