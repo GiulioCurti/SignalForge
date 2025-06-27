@@ -7,7 +7,7 @@ from numpy.testing import assert_allclose, assert_almost_equal
 def sample_signal():
     np.random.seed(42)
     fs = 1000  # Hz
-    T = 1.0    # seconds
+    T = 10.0    # seconds
     N = int(T * fs)
     t = np.linspace(0, T, N, endpoint=False)
     x = np.sin(2 * np.pi * 50 * t) + 0.5 * np.random.randn(N)
@@ -61,6 +61,11 @@ def test_add_scalar(sample_signal):
     new_sig = sample_signal + 3
     assert isinstance(new_sig, SingleChanSignal)
     assert_allclose(new_sig.x, sample_signal.x + 3)
+
+def test_nonstat_index(sample_signal):
+    sample_signal.get_nonstat_index()
+    sample_signal.get_nonstat_index(idx_type='adf')
+    sample_signal.get_nonstat_index(idx_type='kpss')
 
 # You can test plotting functions to make sure they run without exceptions
 def test_plot_methods_run(sample_signal):

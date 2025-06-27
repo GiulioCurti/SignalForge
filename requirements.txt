@@ -1,5 +1,7 @@
-numpy
+numpy>=2.0
 scipy
 matplotlib>=3.10
 tqdm
 PyWavelets
+pyNNST
+statsmodels

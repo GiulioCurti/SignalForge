@@ -2,6 +2,11 @@ import numpy as np
 import pytest
 from SignalForge.utils import *
 
+def get_signals():
+    stat_signal = np.random.randn(1000)
+    nonstat_signal = np.stack([np.random.randn(500),10*np.random.randn(500)])   
+    return stat_signal, nonstat_signal.flatten()
+
 def test_method_existance_check_valid():
     methods = {'a': lambda x: x}
     method_existance_check('a', methods)  # Should not raise
@@ -63,10 +68,38 @@ def test_get_psd_impulse_response():
     h = get_psd_impulse_response(f, psd, 1024)
     assert len(h) == 1024
 
-def test_get_nonstat_index():
-    signal = np.random.randn(1000)
-    kurtosis_trace = get_nonstat_index(signal, winsize=100, idx_type='kurtosis')
-    assert len(kurtosis_trace) == len(signal) - 100 + 1
+def test_get_stat_history():
+    stat_signal, _ = get_signals()
+    kurtosis_trace = get_stat_history(stat_signal, winsize=100, idx_type='kurtosis')
+    mean_trace = get_stat_history(stat_signal, winsize=100, idx_type='mean')
+    rms_trace = get_stat_history(stat_signal, winsize=100, idx_type='rms')
+    var_trace = get_stat_history(stat_signal, winsize=100, idx_type='var')
+
+    mean_kurt = np.mean(kurtosis_trace)
+    mean_mean = np.mean(mean_trace)
+    mean_rms = np.mean(rms_trace)
+    mean_var = np.mean(var_trace)
+    assert np.isclose(3, mean_kurt, rtol=0.1)
+    assert np.isclose(1, mean_mean+1, rtol=0.1)
+    assert np.isclose(1, mean_rms, rtol=0.1)
+    assert np.isclose(1, mean_var, rtol=0.1)
+
+def test_get_nnst_index():
+    stat_signal, nonstat_signal = get_signals()
+    test_stat = get_nnst_index(stat_signal, nperseg=100)
+    test_nonstat = get_nnst_index(nonstat_signal, nperseg=100)
+    assert test_stat['outcome']=='Stationary'
+    assert test_nonstat['outcome']=='Non-stationary'
+
+def test_get_adf_index():
+    stat_signal, _ = get_signals()
+    test_stat = get_adf_index(stat_signal)
+    assert test_stat['outcome']=='Stationary'
+
+def test_get_kpss_index():
+    stat_signal, _ = get_signals()
+    test_stat = get_kpss_index(stat_signal)
+    assert test_stat['outcome']=='Stationary'
 
 def test_get_banded_spectral_kurtosis():
     signal = np.random.randn(1024)

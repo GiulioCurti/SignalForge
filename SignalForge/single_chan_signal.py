@@ -59,6 +59,7 @@ class SingleChanSignal:
         
         self.central_moments = self._get_central_moments()
         self.spectral_moments = self._get_spectral_moments()
+        self.ns_index = {}
         print('Class correctly initialized')
         print(self)
         
@@ -432,9 +433,65 @@ class SingleChanSignal:
             return kurtogram, n_divisions, max_Nfft
         else:
             return kurtogram
+        
+    def get_stat_history(self, winsize:int, olap:int = 0, idx_type = 'rms'):
+        """
+        Compute a statistical index over a moving window.
+
+        Parameters:
+            signal : np.ndarray
+                Time history signal.
+            winsize : int: 
+                Window size.
+            olap : int, optional 
+                The number of points to overlap on the moving window. If not specified, no overlap is considered
+            idx_type : str 
+                Index type: 'mean', 'rms', 'var', or 'kurtosis'.
+
+        Returns:
+            stat_history: np.ndarray
+                Evolution of the statistical index over time.
+            
+        """        
+        stat_th = get_stat_history(self.x, winsize=winsize, olap = olap, idx_type = idx_type)
+        return stat_th
     
-    def get_nonstat_index(self, winsize, idx_type = 'rms'):
-        ns_index = get_nonstat_index(self.x, winsize=winsize, idx_type = idx_type)
+    def get_nonstat_index(self, idx_type = 'nnst',*args, **kwargs):
+        """
+        Computes the requested non stationary test from the given one dimensional time history
+
+        Parameters
+        ---------- 
+        signal: array-like
+            One dimensional time history
+        index_type : str, optional
+            Type of non stationary index to be assessed. Supported methods are: Non-Stationarity index [1]: 'nnst',  Augmented Dickey-Fuller [2]: 'adf', Kwiatkowski-Phillips-Schmidt-Shin [3]: 'kpss'
+        kwargs: optional
+            Argument to be passed to the specific method implementation
+        
+        Returns
+        -------
+        test_results: dict
+            Results of the non-stationary test    
+        
+        Source
+        ------
+        [1] L. Capponi, M. Česnik, J. Slavič, F. Cianetti, e M. Boltežar, «Non-stationarity index in vibration fatigue: Theoretical and experimental research», Int. J. Fatigue, vol. 104, pp. 221–230, nov. 2017, doi: 10.1016/j.ijfatigue.2017.07.020.
+        [2] Dickey, D. A., and W. A. Fuller. "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." Journal of the American Statistical Association. Vol. 74, 1979, pp. 427–431.
+        [3] Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., Shin, Y. (1992). "Testing the null hypothesis of stationarity against the alternative of a unit root". Journal of Econometrics. 54 (1–3): 159–178. doi:10.1016/0304-4076(92)90104-Y.
+
+        """
+        # ns_index = get_nonstat_test(self.x, idx_type, *args, **kwargs)
+        idx_types = {'nnst': get_nnst_index,
+                    'adf': get_adf_index,
+                    'kpss': get_kpss_index}
+    
+        method_existance_check(idx_type, idx_types)
+
+        ns_index = idx_types[idx_type](self.x, *args, **kwargs)
+        print(f'Nonstat evaluation via "{idx_type}" method:')
+        print_nonstat_results(ns_index, indent=4)
+        self.ns_index[idx_type] = ns_index
         return ns_index
     
     def plot(
@@ -527,7 +584,7 @@ class SingleChanSignal:
         ax.grid(True,which = 'both')
         ax.minorticks_on()   
         ax.set_title(f'Probability Density Function {self.name}')
-        ax.ylim([np.min(pdf_gauss), 1.1*np.max([np.max(pdf_gauss), np.max(pdf)])])
+        ax.set_ylim([np.min(pdf_gauss), 1.1*np.max([np.max(pdf_gauss), np.max(pdf)])])
         if xlims is not None:
             ax.set_xlim(xlims)
         if log:
@@ -824,23 +881,26 @@ class SingleChanSignal:
         plt.show(block=False)
         return ax    
     
-    def plot_nonstat_index(
+    def plot_stat_history(
         self, 
         winsize:int, 
+        olap:int = 0,
         idx_type:str='rms', 
         ax = None, 
         xlims:list = None, 
         ylims:list= None
         ):
         """
-        Plot the non-stationarity index of the signal.
+        Plot the statistical indicator time history of the signal on a moving window.
 
         Parameters
         ----------
         winsize : int 
             The window size for the non-stationarity index calculation.
+        olap : int, optional
+            The number of points to overlap on the moving window. If not specified, no overlap is considered
         idx_type : str, optional 
-            The type of index to calculate ('rms' or 'kurt').
+            The type of index to calculate ('rms' or 'kurt'). 
         ax : matplotlib.axes.Axes, optional
             The axes to plot on. If None, a new figure and axes are created.
         xlims : list, optional
@@ -853,7 +913,7 @@ class SingleChanSignal:
         ax :: matplotlib.axes.Axes 
             The axes with the plotted non-stationarity index.
         """
-        ns_index = self.get_nonstat_index(winsize=winsize, idx_type = idx_type)
+        ns_index = self.get_stat_history(winsize=winsize, olap = olap, idx_type = idx_type)
         print(f'Plotting Non-stationarity index: idx_type = {idx_type}')
         t_ns_index = np.linspace(0,1,len(ns_index))*self.T
         if ax is None:

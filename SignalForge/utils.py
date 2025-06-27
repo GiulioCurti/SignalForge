@@ -1,6 +1,8 @@
 import numpy as np
 import scipy as sp
 from tqdm import tqdm
+import pyNNST
+from statsmodels.tsa.stattools import kpss, adfuller
 
 
 def method_existance_check(method:str, methods:dict):
@@ -93,7 +95,7 @@ def get_stat_mom(var, probability, order):
     Returns:
         float: Statistical moment of the given order.
     """
-    return np.trapz(probability*var**order,var)
+    return np.trapezoid(probability*var**order,var)
 
 def alpha_spec_index(fpsd, psd, order, deriv_order):
     """
@@ -135,41 +137,215 @@ def get_psd_impulse_response(fpsd,psd, N, fs = None):
     h_t = np.roll(h_t, N//2) # circular shift to make the impulse centred
     return h_t
 
-def get_nonstat_index(signal, winsize:int, idx_type = 'kurtosis'):
+def get_stat_history(signal:np.ndarray, winsize:int, olap:int = 0, idx_type = 'rms'):
     """
     Compute a statistical index over a moving window.
 
     Parameters:
-        signal (np.ndarray): Time history signal.
-        winsize (int): Window size.
-        idx_type (str): Index type: 'mean', 'rms', 'var', or 'kurtosis'.
+        signal : np.ndarray
+            Time history signal.
+        winsize : int: 
+            Window size.
+        olap : int, optional 
+            The number of points to overlap on the moving window. If not specified, no overlap is considered
+        idx_type : str 
+            Index type: 'mean', 'rms', 'var', or 'kurtosis'.
 
     Returns:
-        np.ndarray: Evolution of the index over time.
+        stat_history: np.ndarray
+            Evolution of the statistical index over time.
         
-    Source:
-    L. Capponi, M. Česnik, J. Slavič, F. Cianetti, e M. Boltežar, «Non-stationarity index in vibration fatigue: Theoretical and experimental research», Int. J. Fatigue, vol. 104, pp. 221–230, nov. 2017, doi: 10.1016/j.ijfatigue.2017.07.020.
     """
-    idx_types = {'mean':sp.stats.tmean,
-                 'rms':sp.stats.tstd,
-                 'var':sp.stats.tvar,
+    idx_types = {'mean':np.mean,
+                 'rms':np.std,
+                 'var':np.var,
                  'kurtosis':sp.stats.kurtosis}
     
     method_existance_check(idx_type, idx_types)
     
     winsize = int(np.round(winsize))
-    
-    idx_history = np.zeros((len(signal) - winsize + 1))
+    olap = int(np.round(olap))
+    step = winsize-olap
+
+    idx_history = np.zeros((len(signal) - winsize + 1)//(step)+1)
     
     print(f'Calculating {idx_type} evolution')
     k = 0
-    for i in tqdm(range(len(signal) - winsize + 1)):
+    for i in tqdm(range(0, len(signal) - winsize + 1, step)):
         index =  idx_types[idx_type](signal[i : i + winsize])
         idx_history[k] = index
         k += 1
     if 'kurtosis' in idx_type:
         idx_history = idx_history+3
     return idx_history
+
+def get_nnst_index(signal, nperseg = 100, noverlap = 0, *args, **kwargs):
+    """
+    Non-stationarity index identification using modified run-test.
+    Standard deviation of entire signal is compared to standard deviation of segmented signal,
+    and the number of variations (i.e., runs) is compared to expected value of variations to obtain
+    the non-stationarity index.
+
+    For the complete documentation please refer to: https://github.com/LolloCappo/pyNNST
+
+    Parameters
+    ---------- 
+    signal: array-like
+        One dimensional time history
+    nperseg : int
+        Length of each segment
+    
+    noverlap: int, optional
+        Number of points to overlap between segments. If None,
+        "noverlap = 0". Defaults to None.
+
+    confidence: int, optional
+        Confidence interval [90-95-98-99] %. If None, 
+        "confidence = 95". Defaults to None.    
+    
+    *args, **kwargs: optional
+        Additional arguments for the method
+    
+    Returns
+    -------
+    test_results: dict
+        Results of the non-stationary test    
+    
+    Source
+    ------
+    L. Capponi, M. Česnik, J. Slavič, F. Cianetti, e M. Boltežar, «Non-stationarity index in vibration fatigue: Theoretical and experimental research», Int. J. Fatigue, vol. 104, pp. 221–230, nov. 2017, doi: 10.1016/j.ijfatigue.2017.07.020.
+    """
+    test = pyNNST.nnst(signal, nperseg = nperseg, noverlap=noverlap, *args, **kwargs)
+    test.idns() # perform index assessment
+    test_results = {
+        'outcome': test.get_outcome(),
+        'test': test.get_index(),
+        'winsize': test.nperseg,
+        'olap': test.noverlap,
+        'confidence': test.confidence,
+    }
+    return test_results
+
+def get_adf_index(signal, maxlag=None, regression='c', autolag='AIC', *args, **kwargs):
+    """
+    Augmented Dickey-Fuller unit root test from the statsmodels package.
+
+    The Augmented Dickey-Fuller test can be used to test for a unit root in a univariate process in the presence of serial correlation.
+
+    For the complete documentation please refer to: https://www.statsmodels.org/stable/generated/statsmodels.tsa.stattools.adfuller.html#statsmodels.tsa.stattools.adfuller
+
+    Parameters
+    ----------
+    signal : array_like, 1d
+        The data series to test.
+    maxlag : {None, int}
+        Maximum lag which is included in test, default value of
+        12*(nobs/100)^{1/4} is used when ``None``.
+    regression : {"c","ct","ctt","n"}
+        Constant and trend order to include in regression.
+
+        * "c" : constant only (default).
+        * "ct" : constant and trend.
+        * "ctt" : constant, and linear and quadratic trend.
+        * "n" : no constant, no trend.
+
+    autolag : {"AIC", "BIC", "t-stat", None}
+        Method to use when automatically determining the lag length among the
+        values 0, 1, ..., maxlag.
+
+        * If "AIC" (default) or "BIC", then the number of lags is chosen to minimize the corresponding information criterion.
+        * "t-stat" based choice of maxlag.  Starts with maxlag and drops a lag until the t-statistic on the last lag length is significant using a 5%-sized test.
+        * If None, then the number of included lags is set to maxlag.
+
+    *args, **kwargs : optional
+        Additional arguments for the method
+
+    Returns
+    -------
+    test_results : dict
+        Dictionary containing the non-stationarity test results:
+        'outcome', 'test', 'p-value', 'lag', 'crit_values'
+
+    Source
+    ------
+    Dickey, D. A., and W. A. Fuller. "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." Journal of the American Statistical Association. Vol. 74, 1979, pp. 427–431.
+    """
+    test = adfuller(signal, maxlag, regression, autolag, *args, **kwargs)
+    if test[1] < 0.05: # p-value
+        outcome = 'Stationary'
+    else:
+        outcome = 'Non-stationary'
+    test_results = {
+        'outcome': outcome,
+        'test': test[0],
+        'p-value': test[1],
+        'lag': test[2],
+        'crit_values': test[4]
+        }    
+    return test_results
+
+def get_kpss_index(signal, regression = 'c', nlags = 'auto', *args, **kwargs):
+    """
+    Kwiatkowski-Phillips-Schmidt-Shin test for stationarity.
+
+    Computes the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test for the null
+    hypothesis that x is level or trend stationary.
+
+    For the complete documentation please refer to: https://www.statsmodels.org/stable/generated/statsmodels.tsa.stattools.kpss.html#statsmodels.tsa.stattools.kpss
+
+    Parameters
+    ----------
+    signal : array_like, 1d
+        The data series to test.
+    regression : str{"c", "ct"}
+        The null hypothesis for the KPSS test.
+
+        * "c" : The data is stationary around a constant (default).
+        * "ct" : The data is stationary around a trend.
+        
+    nlags : {str, int}, optional
+        Indicates the number of lags to be used. If "auto" (default), lags
+        is calculated using the data-dependent method of Hobijn et al. (1998).
+        See also Andrews (1991), Newey & West (1994), and Schwert (1989). If
+        set to "legacy",  uses int(12 * (n / 100)**(1 / 4)) , as outlined in
+        Schwert (1989).
+    *args, **kwargs : optional
+        Additional arguments for the method
+
+    Returns
+    -------
+    test_results : dict
+        Dictionary containing the non-stationarity test results:
+        'outcome', 'test', 'p-value', 'lag', 'crit_values'
+    
+    Source
+    ------
+    Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., Shin, Y. (1992). "Testing the null hypothesis of stationarity against the alternative of a unit root". Journal of Econometrics. 54 (1–3): 159–178. doi:10.1016/0304-4076(92)90104-Y.
+    """
+    test = kpss(signal, regression=regression, nlags=nlags, *args, **kwargs)
+    if test[1] < 0.05: # p-value
+        outcome = 'Non-stationary'
+    else:
+        outcome = 'Stationary'
+    
+    test_results = {
+        'outcome': outcome,
+        'test': test[0],
+        'p-value': test[1],
+        'lag': test[2],
+        'crit_values': test[3]
+        }
+    return test_results
+
+def print_nonstat_results(ns_test, indent=0):
+    for key, value in ns_test.items():
+        print(' ' * indent + str(key) + ':\t', end=' ')
+        if isinstance(value, dict):
+            print()
+            print_nonstat_results(value, indent + 4)
+        else:
+            print(value)
+    pass
 
 def get_banded_spectral_kurtosis(
     signal: np.ndarray, 
@@ -205,7 +381,7 @@ def get_banded_spectral_kurtosis(
     SK = np.zeros(n_bins)
     print('Evaluating kurtosis on frequency bands:')
     for i in tqdm(np.arange(n_bins)):
-        Xos = np.zeros(len(Xos_full), dtype=np.complex_)
+        Xos = np.zeros(len(Xos_full), dtype=np.complex128)
         Xos[(fper>=(fl+binsize*i)) & (fper<=(fl+binsize*(i+1)))] = Xos_full[(fper>=(fl+binsize*i)) & (fper<=(fl+binsize*(i+1)))]
         x = np.fft.irfft(Xos,n = N)/dt
         SK[i] = sp.stats.kurtosis(x)+3    
@@ -305,7 +481,7 @@ def get_stationary_gaussian(fpsd:np.ndarray, psd:np.ndarray, T:float, fs:float =
     #     fpsd = np.concatenate(([0], psd))
 
     # fvec = np.linspace(0, fs // 2, N_os)
-    mue2 = np.trapz(psd, fpsd)
+    mue2 = np.trapezoid(psd, fpsd)
 
     # Interpolate PSD onto frequency vector
     interpolators ={
