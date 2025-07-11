@@ -12,14 +12,21 @@ def parse_requirements(filename):
 requirements = parse_requirements('requirements.txt')
 print(requirements)
 
-# Load version from _version.py
-version = {}
-with open("signalforge/_version.py") as f:
-    exec(f.read(), version)
+with open('.\SignalForge\__init__.py', 'r', encoding='utf-8') as file:
+    for line in file:
+        line = line.strip()
+        if line.startswith("__version__ ="):
+            # Extract the version string between single quotes
+            start = line.find("'")
+            end = line.rfind("'")
+            if start != -1 and end != -1 and end > start:
+                __version__ =  line[start+1:end]
+                break
+
 
 from setuptools import setup, find_packages
 setup(name='SignalForge',
-    version=version["__version__"],
+    version=__version__,
     license='MIT license',
     author='Giulio Curti',
     author_email='giulio.curti@dottorandi.unipg.it',
