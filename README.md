@@ -1,5 +1,5 @@
 [![Documentation Status](https://app.readthedocs.org/projects/signalforge/badge/?version=latest)](https://signalforge.readthedocs.io/en/latest/)
-
+[![SignalForge Testing](https://github.com/GiulioCurti/SignalForge/actions/workflows/python-app.yml/badge.svg)](https://github.com/GiulioCurti/SignalForge/actions/workflows/python-app.yml)
 SignalForge
 -----------
 
