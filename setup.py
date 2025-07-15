@@ -1,3 +1,5 @@
+import os
+
 # Automatically parse the requirements.txt file for project requirements
 def parse_requirements(filename):
     ''' Load requirements from a pip requirements file '''
@@ -12,7 +14,8 @@ def parse_requirements(filename):
 requirements = parse_requirements('requirements.txt')
 print(requirements)
 
-with open('.\SignalForge\__init__.py', 'r', encoding='utf-8') as file:
+init_path = os.path.join('SignalForge', '__init__.py')
+with open(init_path, 'r', encoding='utf-8') as file:
     for line in file:
         line = line.strip()
         if line.startswith("__version__ ="):
