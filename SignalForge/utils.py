@@ -17,7 +17,9 @@ def method_existance_check(method:str, methods:dict):
         KeyError: If method is not in the dictionary keys.
     """
     if method not in methods.keys():
-        raise KeyError(f'Index {method} not supported. Try with: {[f'"{key}"' for key in methods.keys()]}')
+        options = ', '.join(f'"{key}"' for key in methods.keys())
+        raise KeyError(f'Index {method} not supported. Try with: {options}')
+        # raise KeyError(f'Index {method} not supported. Try with: {[f'"{key}"' for key in methods.keys()]}')
 
 def step_interp(x, xp, yp):
     """

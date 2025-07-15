@@ -130,7 +130,7 @@ def get_winterstein(
     opt_params = None
     return ng_signal, opt_params
 
-def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None): 
+def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0, params = None): 
     """
     Applies a cubic polynomial transformation to a signal to match specified skewness and kurtosis.
 
@@ -166,7 +166,6 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
     
     ## * OBJECTIVE FUNCTION WITH TIMEHISTORY
     # def cubic_obj_fun(var):
-    #     nonlocal x, input_rms, input_kurtosis
     #     z = cubic_transform(x, var)
     #     obj_val = abs(np.abs(sp.stats.kurtosis(z) + 3 - input_kurtosis)  + np.abs(sp.stats.skew(z) - input_skewness))
     #     return obj_val
@@ -175,7 +174,6 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal x, pdf_x, input_rms, input_kurtosis, input_skewness
         z = cubic_transform(grid, var)
         
         ## * FOR EQUIVALENCE TO TIMESERIES TEST
@@ -201,7 +199,7 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
     opt_params = {'a': optim_res.x}
     return ng_signal, opt_params
 
-def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None):
+def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0, params = None):
     """
     Applies Zheng's transformation to achieve a desired kurtosis and skewness.
 
@@ -236,7 +234,6 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = No
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal x, pdf_x, input_rms, input_kurtosis, input_skewness
         if len(var)==1:
             z = tranform_fun(grid, var, var)
         else:    
@@ -279,7 +276,7 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = No
     opt_params = {'a': a, 'b': b}
     return ng_signal, opt_params
     
-def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = None, params = None): 
+def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0, params = None): 
     """
     Applies Sarkani's transformation to achieve a desired kurtosis and skewness.
 
@@ -308,7 +305,6 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
     
     ## * OBJECTIVE FUNCTION WITH TIMEHISTORY
     # def sarkani_time_obj_fun(var):
-    #     nonlocal x, sx, input_kurtosis
     #     beta = var[0]
     #     n = var[1]
     #     # C = np.sqrt(1+(2**(1/2/(n+1)*n*sp.special.gamma(n/2)*sx**(n-1)))*beta/(np.sqrt(np.pi))+(2**n*sp.special.gamma(n+0.5)*sx**(2*(n-1)))*beta**2/((np.sqrt(np.pi))))
@@ -321,7 +317,6 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal x,input_rms, grid, pdf_x, input_kurtosis
         b1 = var[0]
         b2 = var[1]
         z = sarkani_transform(grid, b1, b2)
@@ -388,7 +383,6 @@ def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:f
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal signal, FFT_amplitudes, fs, input_kurtosis, input_rms
         beta = var[0]
         n = var[1]
         z = zengh_transform(signal, beta, n, fs)
@@ -492,7 +486,6 @@ def get_steinwolf(
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal a, b, N, input_kurtosis
         n_deterministic_frequencies = params[0]
         deterministic_armonics_id = np.random.randint(np.floor(params[1]),np.ceil(params[2]),n_deterministic_frequencies.astype(int)).astype(int)
         x = steinwolf_transform(a, b, deterministic_armonics_id, fs)
@@ -559,7 +552,7 @@ def get_smallwood(
     D. O. Smallwood, «Generation of Stationary Non-Gaussian Time Histories with a Specified Cross-spectral Density», Shock Vib., vol. 4, fasc. 5–6, pp. 361–377, 1997, doi: 10.1155/1997/713593.
     """ 
     def get_shot_noise_smallwood(A, lam, p, I, N, seed = None):
-        nonlocal psd, fs
+        # nonlocal psd, fs
         N = round(N)
         h_t = get_psd_impulse_response(psd, fs, N)
         if seed: np.random.seed(seed=seed)
@@ -577,7 +570,6 @@ def get_smallwood(
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        nonlocal p, input_kurtosis, N
         A = 1
         lam = params[0]
         I = params[1]
