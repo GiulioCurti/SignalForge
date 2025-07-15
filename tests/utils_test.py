@@ -3,7 +3,7 @@ import pytest
 from SignalForge.utils import *
 
 def get_signals():
-    stat_signal = np.random.randn(1000)
+    stat_signal = np.random.randn(10000)
     nonstat_signal = np.stack([np.random.randn(500),10*np.random.randn(500)])   
     return stat_signal, nonstat_signal.flatten()
 
