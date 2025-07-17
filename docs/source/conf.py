@@ -7,6 +7,17 @@ import os
 import sys
 sys.path.insert(0,os.path.abspath('../SignalForge'))
 sys.path.insert(0, os.path.abspath('../..'))
+init_path = os.path.join('SignalForge', '__init__.py')
+with open(init_path, 'r', encoding='utf-8') as file:
+    for line in file:
+        line = line.strip()
+        if line.startswith("__version__ ="):
+            # Extract the version string between single quotes
+            start = line.find("'")
+            end = line.rfind("'")
+            if start != -1 and end != -1 and end > start:
+                __version__ =  line[start+1:end]
+                break
 
 import sphinx_rtd_theme # read the docs theme
 
@@ -16,7 +27,7 @@ import sphinx_rtd_theme # read the docs theme
 project = 'SignalForge'
 copyright = '2025, Giulio Curti'
 author = 'Giulio Curti'
-release = '0.0.1'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
