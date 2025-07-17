@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from SignalForge.utils import *
 
+@pytest.fixture
 def get_signals():
     stat_signal = np.random.randn(10000)
     nonstat_signal = np.stack([np.random.randn(500),10*np.random.randn(500)])   
