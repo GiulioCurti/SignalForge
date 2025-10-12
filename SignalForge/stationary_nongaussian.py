@@ -142,6 +142,8 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
             Target kurtosis.
         input_skewness : float 
             Target skewness.
+        param : dict {'a':[float, float, float]}
+            Transformation parameters to bypass the optimization procedure
 
     Returns
     ------
@@ -187,6 +189,14 @@ def get_cubic_polinomial(signal:np.ndarray, input_kurtosis:float, input_skewness
     
     x = signal
     input_rms, grid, pdf_x = _get_signal_statistics(x)
+
+    if params is not None: # Optimization bypass
+        try:
+            ng_signal = cubic_transform(x, params['a'])    
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'a':[float, float, float]}")
+        return ng_signal, params
+
     constraint = {'type': 'ineq', 'fun': nonlinear_constraint}
     optim_res = sp.optimize.minimize(
         cubic_obj_fun, 
@@ -211,6 +221,8 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0,
             Target kurtosis.
         input_skewness (float, optional): 
             Target skewness. If None, assumes symmetry.
+        param : dict {'a': float, 'b': float}
+            Transformation parameters to bypass the optimization procedure
 
     Returns
     -------
@@ -249,7 +261,7 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0,
         return obj_val
     
     input_rms = np.std(signal) 
-    x = signal / np.max(np.abs(signal)) # input signal needs to be normalized to a N[0,1] process
+    x = signal / np.max(np.abs(signal)) # input signal needs to be normalized to its maximum value
     _, grid, pdf_x = _get_signal_statistics(x)
     
     if input_kurtosis>3:
@@ -258,6 +270,14 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0,
     else:
         transform_function = zheng_transform_platykurtic
         init_approx = 2.36*np.exp(3-input_kurtosis)-2 **0.171-2 # only for a==b -> skewness = 0
+    
+    if params is not None: # Optimization bypass
+        try:
+            ng_signal = transform_function(x, params['a'], params['b'])    
+            ng_signal = ng_signal*(input_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'a': float, 'b': float}")
+        return ng_signal, params
     
     if input_skewness:
         optim_res = sp.optimize.minimize(zheng_obj_fun, args = transform_function, x0=[2, 2], bounds=[(0, 10), (1, 3)])
@@ -271,8 +291,7 @@ def get_zheng(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 0,
         b = a
         
     ng_signal = transform_function(x, a, b)    
-    output_rms = np.std(ng_signal)
-    ng_signal = ng_signal*(input_rms/output_rms) # bring back rms to original value
+    ng_signal = ng_signal*(input_rms/np.std(ng_signal)) # bring back rms to original value
     opt_params = {'a': a, 'b': b}
     return ng_signal, opt_params
     
@@ -288,6 +307,8 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
             Target kurtosis.
         input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
+        param : dict {'b1': float, 'b2': float}
+            Transformation parameters to bypass the optimization procedure
 
     Returns
     -------
@@ -332,8 +353,16 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
     if input_skewness:
         raise UserWarning('Skewness correction for sarkani method is not available. Please, set skewness = 0 or consider using another method')
 
-    x = signal
-    input_rms, grid, pdf_x = _get_signal_statistics(x)
+    input_rms, grid, pdf_x = _get_signal_statistics(signal)
+
+    if params is not None: # Optimization bypass
+        try:
+            ng_signal = sarkani_transform(signal, params['b1'], params['b2'])    
+            ng_signal = ng_signal*(input_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'b1': float, 'b2': float}")
+        return ng_signal, params
+
     optim_res = sp.optimize.minimize(sarkani_obj_fun, x0=[2, 2], bounds=[(0, 5), (1, 5)])
     b1 = optim_res.x[0]
     b2 = optim_res.x[1]
@@ -356,6 +385,8 @@ def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:f
             Target kurtosis.
         input_skewness : float, optional
             Target skewness. If None, assumes symmetry.
+        param : dict {'beta': float, 'n': float}
+            Transformation parameters to bypass the optimization procedure
 
     Returns
     -------
@@ -398,6 +429,15 @@ def get_zmnl(signal:np.ndarray, fs:float, input_kurtosis:float, input_skewness:f
     Nos         = np.ceil((len(signal)+1)/2)           
     Xos = Xts_woShift[0:int(Nos)] 
     FFT_amplitudes = np.abs(Xos)
+
+    if params is not None: # Optimization bypass
+        try:
+            ng_signal = zengh_transform(signal, params['beta'], params['n'])    
+            ng_signal = ng_signal*(input_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'beta': float, 'n': float}")
+        return ng_signal, params
+    
     optim_res = sp.optimize.minimize(zmnl_obj_fun, x0=[2, 2], bounds=[(0, 5), (0, 5)])
     beta = optim_res.x[0]
     n = optim_res.x[1]
@@ -426,6 +466,8 @@ def get_steinwolf(
             Target kurtosis.
         input_skewness : float, optional 
             Target skewness. If None, assumes symmetry.
+        param : dict {'nd': int, 'seed': int}
+            Transformation parameters to bypass the optimization procedure
 
     Returns
     -------
@@ -482,36 +524,45 @@ def get_steinwolf(
         x = np.fft.irfft(Xos/dt)
         return x
         
-    def steinwolf_obj_fun(params,fs):
+    def steinwolf_obj_fun(params,fs, relevant_armonics):
         """
         Objective function to minimize the absolute error in kurtosis and skewness after transformation.
         """
-        n_deterministic_frequencies = params[0]
-        deterministic_armonics_id = np.random.randint(np.floor(params[1]),np.ceil(params[2]),n_deterministic_frequencies.astype(int)).astype(int)
-        x = steinwolf_transform(a, b, deterministic_armonics_id, fs)
+        deterministic_freqs_ids = relevant_armonics[range(params[0].astype(int))]
+        x = steinwolf_transform(a, b, deterministic_freqs_ids , fs)
         transformed_kurtosis = sp.stats.kurtosis(x) + 3
         return np.abs(transformed_kurtosis - input_kurtosis)
     
     if input_skewness:
         raise UserWarning('Skewness correction for the smallwood method is not available. Please, set skewness = 0 or consider using another method')
 
+    seed = np.random.randint(1e6,1e7-1) 
     input_rms = np.std(signal)    
     Xts_woShift = (1/fs)*np.fft.fft(signal)
     Nos         = np.ceil((len(signal)+1)/2)           
     Xos = Xts_woShift[0:int(Nos)] 
     A = np.abs(Xos)
+    relevant_armonics = np.flatnonzero(A > (input_rms / 10))
     phi = np.angle(Xos)
     N = len(A)
     a = A*np.cos(phi)
     b = -A*np.sin(phi)
     
-    # f_Xos = np.linspace(0,fs/2,N)
-    constraint = {'type': 'ineq', 'fun': lambda x : x[2]-x[1]}
-    optim_res = sp.optimize.minimize(steinwolf_obj_fun, args = (fs), x0=[1, 0,1], bounds=[(1,N//2),(1,N-2),(2,N-1)], constraints=[constraint])
-    
-    ng_signal = steinwolf_transform(a, b, optim_res.x)
+    if params is not None: # Optimization bypass
+        try:
+            rng = np.random.default_rng(seed=params['seed'])
+            rng.shuffle(relevant_armonics)
+            ng_signal = steinwolf_transform(a, b, params['nd'], fs)    
+            ng_signal = ng_signal*(input_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'nd': int, 'seed'}")
+        return ng_signal, params
+    rng = np.random.default_rng(seed=seed)
+    rng.shuffle(relevant_armonics)
+    optim_res = sp.optimize.minimize(steinwolf_obj_fun, args = (fs, relevant_armonics.flatten()), x0=[1], bounds=[(1,len(relevant_armonics)-1)])
+    ng_signal = steinwolf_transform(a, b, relevant_armonics[range(optim_res.x[0].astype(int))], fs)
     ng_signal*(input_rms/np.std(ng_signal))
-    opt_params = {'a': optim_res.x[1],'b': optim_res.x[1], 'deterministic_armonics_id': optim_res.x[2]}
+    opt_params = {'nd': optim_res.x[0].astype(int), 'seed': seed}
     return ng_signal, opt_params
 
 def get_smallwood(
@@ -540,6 +591,8 @@ def get_smallwood(
             Target skewness. If None, assumes symmetry.
         seed : int
             Seed for the random generator for the Poisson shot times and amplitudes.
+        param : dict {'lam': float, 'I': float, 'seed': int}
+            Transformation parameters to bypass the optimization procedure
             
     Returns
     -------
@@ -589,10 +642,20 @@ def get_smallwood(
     h4 = np.sum((h_t)**4)/fs
     lam_0 = h4/h2**2*(1/(input_kurtosis**4-3))
     p = 0.5
+
+    if params is not None: # Optimization bypass
+        try:
+            seed = params['seed']
+            ng_signal = get_shot_noise_smallwood(A = 1, lam = params['lam'], N=N, p = p, I = params['I'])    
+            ng_signal = ng_signal*(inp_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'beta': float, 'n': float, 'seed': int}")
+        return ng_signal, params
+    
     optim_res = sp.optimize.minimize(smallwood_opt_fun,args = (seed), x0=[lam_0, 1.5], bounds=[(0.001,100), (1,2)])
     ng_signal = get_shot_noise_smallwood(A = 1, lam = optim_res.x[0], N=N, p = p, I = optim_res.x[1])
     ng_signal = ng_signal*(inp_rms/np.std(ng_signal))
-    opt_params = {'lam': optim_res.x[0], 'I': optim_res.x[1]}
+    opt_params = {'lam': optim_res.x[0], 'I': optim_res.x[1], 'seed': seed}
     return ng_signal, opt_params
 
 def get_vanbaren(
@@ -621,6 +684,8 @@ def get_vanbaren(
             Target skewness. If None, assumes symmetry.
         seed : int
             Seed for the random generator for the Poisson shot times and amplitudes.
+        param : dict {'alpha': float, 'seed': int}
+            Transformation parameters to bypass the optimization procedure
     Returns
     -------
         ng_signal : np.ndarray 
@@ -662,11 +727,19 @@ def get_vanbaren(
     # _, gauss_signal = get_stationary_gaussian(fpsd, psd/inp_rms**2, T)
     h_t = get_psd_impulse_response(fpsd, psd, N//2)
     
+    if params is not None: # Optimization bypass
+        try:
+            ng_signal = get_shot_noise_vanbaren(alpha = params['alpha'], h_t = h_t, seed = params['seed'])    
+            ng_signal = ng_signal*(inp_rms/np.std(ng_signal)) # bring back rms to original value
+        except: 
+            raise KeyError("The 'param' argument must be a dictionary with the format: {'alpha': float, 'seed': int}")
+        return ng_signal, params
+
     optim_res = sp.optimize.minimize(vanbaren_opt_fun, method = 'Nelder-Mead', args = (h_t, seed), x0=[10], bounds=[(1.001,100)], options = {'disp': True})
     shot_noise = get_shot_noise_vanbaren(alpha = optim_res.x[0], h_t = h_t, seed = seed)
     ng_signal = shot_noise
     ng_signal = ng_signal*(inp_rms/np.std(ng_signal))
-    opt_params = {'alpha': optim_res.x[0]}
+    opt_params = {'alpha': optim_res.x[0], 'seed': seed}
     return ng_signal, opt_params
 
 
