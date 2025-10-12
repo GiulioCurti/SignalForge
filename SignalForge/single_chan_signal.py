@@ -523,7 +523,7 @@ class SingleChanSignal:
         s_skew = self.central_moments['skew']
         s_kurt = self.central_moments['kurtosis']
         label = f"{self.name}: rms = {s_rms:.2f} [{self.unit}] | $skew $ = {s_skew:.2f} [-] | $kurt $ = {s_kurt:.2f} [-]"
-        ax.plot(self.t,self.x,'k',label=label)
+        ax.plot(self.t,self.x,'k',label=label, linewidth=0.5)
         ax.set_xlabel("Time [s]")
         ax.set_ylabel(f"Amplitude [{self.unit}]")
         ax.legend()   
@@ -595,8 +595,8 @@ class SingleChanSignal:
     def plot_fft(
         self,
         ax = None, 
-        xlims:list = None, 
-        ylims:list= None
+        xlims: list = None, 
+        ylims: list = None
         ):
         """
         Plot the Fourier Transform (FT) of the signal.
@@ -620,26 +620,38 @@ class SingleChanSignal:
         if ax is None:
             _, ax = plt.subplots(nrows=2, figsize=(10, 4), sharex='all', tight_layout=True)
         
+        # Convert to array for uniform handling
+        ax_array = np.atleast_1d(ax)
+        is_array = len(ax_array) > 1
+        
         s_rms = self.central_moments['rms']
-        label = f"$FT_{{self.var}}$: rms = {s_rms:.2f} [{self.unit}]"
-        ax[0].plot(self.f_fft_os,np.abs(self.fft_os),'k',label=label)
-        # ax[0].set_xlabel("Frequency [Hz]")
-        ax[0].set_ylabel(f"$FT_{self.var}$ [{self.unit}]")
-        ax[0].legend()   
-        ax[0].grid(True,which = 'both')
-        ax[0].minorticks_on()   
-        ax[0].set_title(f'Fourier transform {self.name}')
-        if len(ax)>1:
-            ax[1].plot(self.f_fft_os,np.angle(self.fft_os),'k',label=label)
-            ax[1].set_xlabel("Frequency [Hz]")
-            ax[1].set_ylabel(f"$\\phi_{self.var}$ [rad]")
-            # ax[1].legend()   
-            ax[1].grid(True,which = 'both')
-            ax[1].minorticks_on()   
+        label = f"$FT_{{{self.var}}}$: rms = {s_rms:.2f} [{self.unit}]"
+        
+        ax0 = ax_array[0]
+        ax0.plot(self.f_fft_os, np.abs(self.fft_os), 'k', label=label)
+        ax0.set_ylabel(f"$FT_{{{self.var}}}$ [{self.unit}]")
+        ax0.legend()   
+        ax0.grid(True, which='both')
+        ax0.minorticks_on()   
+        ax0.set_title(f'Fourier transform {self.name}')
+        
+        if is_array:
+            ax_array[1].plot(self.f_fft_os, np.angle(self.fft_os), 'k', label=label)
+            ax_array[1].set_ylabel(f"$\\phi_{{{self.var}}}$ [rad]")
+            ax_array[1].grid(True, which='both')
+            ax_array[1].minorticks_on()
+            ax_array[1].set_xlabel("Frequency [Hz]")
+            ax0.sharex(ax_array[1])
+        else:
+            ax0.set_xlabel("Frequency [Hz]")
+        
         if xlims is not None:
-            ax.set_xlim(xlims)
+            for a in ax_array:
+                a.set_xlim(xlims)
+        
         if ylims is not None:
-            ax.set_ylim(ylims)
+            ax_array[0].set_ylim(ylims)
+        
         plt.show(block=False)
         return ax
     
@@ -748,7 +760,9 @@ class SingleChanSignal:
         self, 
         nperseg:int = 2**10, 
         hop = 2**8,
-        flims:list = None):
+        flims:list = None,
+        fig = None,
+        ax = None):
         """
         Plot the Short-Time Fourier Transform (STFT) of the signal.
 
@@ -767,7 +781,8 @@ class SingleChanSignal:
         print(f'Calculating STFT')
         Sx, SFT = self.get_sftf(nperseg = nperseg, hop = hop, nargout=2)
         print(f'Plotting STFT')
-        fig, ax = plt.subplots(figsize=(10, 4), sharex='all', tight_layout=True)
+        if ax is None and fig is None:
+            fig, ax = plt.subplots(figsize=(10, 4), sharex='all', tight_layout=True)
         
         t_lo, t_hi = SFT.extent(self.N)[:2]  # time range of plot
         ax.set_title(rf"Short time Fourier transform {self.name}")
