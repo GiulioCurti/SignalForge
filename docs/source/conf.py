@@ -4,10 +4,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 import os
-import sys
-sys.path.insert(0,os.path.abspath('../SignalForge'))
-sys.path.insert(0, os.path.abspath('../..'))
-init_path = os.path.join('SignalForge', '__init__.py')
+init_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'SignalForge', '__init__.py'))
 with open(init_path, 'r', encoding='utf-8') as file:
     for line in file:
         line = line.strip()
