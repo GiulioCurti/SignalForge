@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sdypy"
+version = "0.5.1"
+authors = [{name = "Giulio Curti", email = "giulio.curti@dottorandi.it"}]
+maintainers = [{name = "Giulio Curti", email = "giulio.curti@dottorandi.it"}]
+license = "MIT"
+description = "SignalForge - Tools for analyzing and generating non-Gaussian, non-stationary signals in engineering applications."
+readme = "README.md"
+keywords = ["Python", "Signal Processing", "Signal simulation"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "tqdm",
+    "pyWavelets",
+    "pyNNST",
+    "statsmodel",
+]
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'Topic :: Scientific/Engineering',
+    'Programming Language :: Python :: 3.10',
+    "License :: OSI Approved :: MIT License",
+]
+
+# For namespace packages (signalforge is the namespace)
+[tool.hatch.build.targets.wheel]
+include = ["signalforge"]
+
+[project.optional-dependencies]
+dev = [
+    "sphinx",
+    "twine",
+    "pytest",
+    "build",
+    "sphinx-rtd-theme"
+]
+
+[project.urls]
+homepage = "https://github.com/GiulioCurti/SignalForge"
+documentation = "https://signalforge.readthedocs.io/en/latest/"
+source = "https://github.com/GiulioCurti/SignalForge"

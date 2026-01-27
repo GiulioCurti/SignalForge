@@ -3,3 +3,5 @@
 sphinx
 pytest
 sphinx-rtd-theme
+twine
+build
