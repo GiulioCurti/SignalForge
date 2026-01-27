@@ -8,6 +8,13 @@ SignalForge is an open-source Python package that provides a comprehensive set o
 
 See the [documentation](<https://signalforge.readthedocs.io/en/latest/>) for a complete overview of the implemented methods for analisys and signal generation.
 
+Installing SignalForge
+------------------------------------------------------------
+The package is published in PiPy. To install it:
+```bash
+pip install signalforge
+```
+
 Example code on how to generate a Stationary Gaussian Signal
 ------------------------------------------------------------
 
