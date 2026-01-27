@@ -19,7 +19,7 @@ dependencies = [
     "tqdm",
     "pyWavelets",
     "pyNNST",
-    "statsmodel",
+    "statsmodels",
 ]
 classifiers = [
     'Development Status :: 5 - Production/Stable',
