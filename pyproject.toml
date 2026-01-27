@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sdypy"
+name = "SignalForge"
 version = "0.5.1"
 authors = [{name = "Giulio Curti", email = "giulio.curti@dottorandi.it"}]
 maintainers = [{name = "Giulio Curti", email = "giulio.curti@dottorandi.it"}]
