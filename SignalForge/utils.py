@@ -1,8 +1,6 @@
 import numpy as np
 import scipy as sp
 from tqdm import tqdm
-import pyNNST
-from statsmodels.tsa.stattools import kpss, adfuller
 
 
 def method_existance_check(method:str, methods:dict):
@@ -217,7 +215,8 @@ def get_nnst_index(signal, nperseg = 100, noverlap = 0, *args, **kwargs):
     ------
     L. Capponi, M. Česnik, J. Slavič, F. Cianetti, e M. Boltežar, «Non-stationarity index in vibration fatigue: Theoretical and experimental research», Int. J. Fatigue, vol. 104, pp. 221–230, nov. 2017, doi: 10.1016/j.ijfatigue.2017.07.020.
     """
-    test = pyNNST.nnst(signal, nperseg = nperseg, noverlap=noverlap, *args, **kwargs)
+    from pyNNST import nnst
+    test = nnst(signal, nperseg = nperseg, noverlap=noverlap, *args, **kwargs)
     test.idns() # perform index assessment
     test_results = {
         'outcome': test.get_outcome(),
@@ -272,6 +271,7 @@ def get_adf_index(signal, maxlag=None, regression='c', autolag='AIC', *args, **k
     ------
     Dickey, D. A., and W. A. Fuller. "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." Journal of the American Statistical Association. Vol. 74, 1979, pp. 427–431.
     """
+    from statsmodels.tsa.stattools import adfuller
     test = adfuller(signal, maxlag, regression, autolag, *args, **kwargs)
     if test[1] < 0.05: # p-value
         outcome = 'Stationary'
@@ -324,6 +324,7 @@ def get_kpss_index(signal, regression = 'c', nlags = 'auto', *args, **kwargs):
     ------
     Kwiatkowski, D., Phillips, P. C. B., Schmidt, P., Shin, Y. (1992). "Testing the null hypothesis of stationarity against the alternative of a unit root". Journal of Econometrics. 54 (1–3): 159–178. doi:10.1016/0304-4076(92)90104-Y.
     """
+    from statsmodels.tsa.stattools import kpss
     test = kpss(signal, regression=regression, nlags=nlags, *args, **kwargs)
     if test[1] < 0.05: # p-value
         outcome = 'Non-stationary'
@@ -912,7 +913,6 @@ def fast_kurtogram(x, fs, nlevel=7,plot=False):
     
     
     return Kwav, Level_w, freq_w, fc, bandwidth ,max_kurt,level_max,c
-    
 
 def get_stationary_gaussian(fpsd:np.ndarray, psd:np.ndarray, T:float, fs:float = None, seed = None, interp:str = 'lin'):
     """

@@ -1,12 +1,7 @@
-import numpy as np
-import scipy as sp
 import matplotlib.pyplot as plt
-import pywt
 import os
 
-
 from .utils import *
-
 
 class SingleChanSignal:
     """
@@ -366,6 +361,7 @@ class SingleChanSignal:
         f : ndarray
             Frequencies corresponding to wavelet scales.
         """
+        import pywt
         print(f'Calculating continuyous wavelet transform with "{wavetype}" wave')
         wavelet = pywt.ContinuousWavelet(wavetype)
         scales = pywt.central_frequency(wavelet) * self.fs / np.arange(10, 150, 1)
@@ -1179,8 +1175,7 @@ class SingleChanSignal:
         plt.show(block=False)
 
         return ax
-        
-    
+          
     def plot_scalogram(self, ax = None, wavetype = 'morl', **kwargs):
         """
         Plot the scalogram of the signal using wavelet transformation.

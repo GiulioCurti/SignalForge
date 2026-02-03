@@ -1,10 +1,5 @@
-import numpy as np
-import scipy as sp
-import matplotlib.pyplot as plt
-
 from .utils import *
 from .single_chan_signal import SingleChanSignal
-
 
 '''
 supporting functions / 'static methods' (no need of self object)
