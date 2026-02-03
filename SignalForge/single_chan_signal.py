@@ -136,7 +136,7 @@ class SingleChanSignal:
     @property # for storage efficiency
     def fft_ts(self):
         """two-sided Fourier coefficients"""   
-        Xts_woShift = self.dt*np.fft.fft(self.x)
+        Xts_woShift = np.fft.fft(self.x)/self.N
         return np.fft.fftshift(Xts_woShift)
     
     @property # for storage efficiency
@@ -148,16 +148,14 @@ class SingleChanSignal:
     @property # for storage efficiency
     def fft_os(self):
         """one-sided Fourier coefficients"""
-        Xts_woShift = self.dt*np.fft.fft(self.x)
-        Nos         = np.ceil((self.N+1)/2)             # number of one-sided Fourier coefficients
-        return Xts_woShift[0:int(Nos)]       
+        Xos = np.fft.rfft(self.x)*2/self.N
+        return Xos       
      
     @property # for storage efficiency
     def f_fft_os(self):
         """one-sided frequency vector"""
-        frq_woShift = np.fft.fftfreq(self.N, self.dt)
-        Nos         = np.ceil((self.N+1)/2)             # number of one-sided Fourier coefficients
-        return np.abs(frq_woShift[0:int(Nos)])
+        frq_os = np.fft.rfftfreq(self.N, self.dt)
+        return frq_os
     
 
     def get_psd(self,df = 0.5,noverlap=None):
@@ -328,6 +326,27 @@ class SingleChanSignal:
         amplitude_envelope = np.abs(analytic_signal)
         instantaneous_phase = np.unwrap(np.angle(analytic_signal))
         return analytic_signal, amplitude_envelope, instantaneous_phase
+
+    def get_squared_envelope_spectrum(self):
+        """
+        Plot the Squared Envelope Spectrum (SES) of the signal.
+
+        Parameters
+        ----------
+
+
+        Returns
+        -------
+        freq : ndarray
+            Frequency array of the SES
+        ses : ndarray
+            SES array 
+        """
+        _, absolute_envelope, _ = self.get_hilbert()
+        se = absolute_envelope**2
+        ses =  np.abs(np.fft.rfft(se)/self.N)**2
+        freq = self.f_fft_os
+        return ses, freq
     
     def get_wavelet_transform(self, wavetype = 'morl', **kwargs):
         """
@@ -400,7 +419,7 @@ class SingleChanSignal:
         f_norm, SK = get_welch_spectral_kurtosis(self.x, Nfft, noverlap)
         return f_norm*self.fs, SK
 
-    def get_kurtogram(self, n_bins:tuple = (10,100,10), _plot_call = False):
+    def get_kurtogram(self, n_bins: tuple|int = None, method = 'fast', _plot_call = False):
         """
         Calculate the kurtogram of the signal.
 
@@ -418,22 +437,52 @@ class SingleChanSignal:
         """
         print(f'Calculating Kurtogram')
         np_freqs = self.N//2
-        try:
-            n_divisions = np.arange(*n_bins)
-        except:
-            raise ValueError('n_bins argument does not meet requirement. Try with a tuple with np.arange() format "(start, finish, step)"')
-        max_Nfft = np_freqs//np.min(n_divisions)
-        ref_fvec = np.linspace(0,1,max_Nfft)*self.fs/2
-        kurtogram = np.zeros((max_Nfft,len(n_divisions)))
-        for i, divisions in tqdm(enumerate(n_divisions)):
-            Nfft = np_freqs//(divisions)
-            fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = Nfft, noverlap = round(3/8*Nfft))
-            kurtogram[:,i] = step_interp(ref_fvec, fvec*self.fs, spectral_kurtosis)
-        if _plot_call:
-            return kurtogram, n_divisions, max_Nfft
-        else:
-            return kurtogram
         
+        if method.lower() == 'fast':
+            if n_bins is None:
+                n_bins = 7
+            elif isinstance(n_bins, int) is False:
+                raise ValueError('n_bins argument does not meet requirements. Format it as an integer')         
+            kurtogram, Level_w, freq_w, fc, bandwidth ,max_kurt,level_max,c = fast_kurtogram(self.x, self.fs, n_bins)
+            if _plot_call:
+                idx_max = np.argmax(kurtogram)
+                I, J = np.unravel_index(idx_max, kurtogram.shape)  # 0-based indices
+                M = kurtogram[I, J]
+                max_kurt = np.round(10*M)/10
+                max_level = np.floor(10*Level_w[I])/10
+                fi = J / (3 * 2**(n_bins + 1))          # normalized frequency
+                fi = fi + 2**(-2 - Level_w[I])
+                bw = self.fs * 2**(-(Level_w[I] + 1))
+                fc = self.fs * fi
+                return kurtogram, np.flip(np.linspace(0,n_bins, 2*n_bins)), np.shape(kurtogram)[1], max_kurt, max_level, bw, fc
+            else:
+                return kurtogram, c
+                        
+        elif method.lower() == 'banded':
+            if n_bins is None:
+                n_divisions = 2**np.arange(4,12,1)
+            else:
+                try:
+                    n_divisions = 2**np.arange(*n_bins)
+                except:
+                    raise ValueError('n_bins argument does not meet requirements. Try with a tuple with np.arange() format "(start, finish, step)"')
+            # max_Nfft = np_freqs//np.min(n_divisions)
+            max_Nfft = np.max(n_divisions)
+            ref_fvec = np.linspace(0,1,max_Nfft)*self.fs/2
+            kurtogram = np.zeros((max_Nfft,len(n_divisions)))
+            for i, divisions in tqdm(enumerate(n_divisions)):
+                # Nfft = np_freqs//(divisions)
+                Nfft = divisions
+                fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = Nfft, noverlap = round(3/8*Nfft))
+                kurtogram[:,i] = step_interp(ref_fvec, fvec*self.fs, spectral_kurtosis)
+            if _plot_call:
+                return kurtogram, n_divisions, max_Nfft
+            else:
+                return kurtogram
+            
+        else:
+            raise ValueError('Method not implemented. Try with "fast" or "banded"')
+            
     def get_stat_history(self, winsize:int, olap:int = 0, idx_type = 'rms'):
         """
         Compute a statistical index over a moving window.
@@ -595,6 +644,7 @@ class SingleChanSignal:
     def plot_fft(
         self,
         ax = None, 
+        two_sided: bool = False,
         xlims: list = None, 
         ylims: list = None
         ):
@@ -628,7 +678,10 @@ class SingleChanSignal:
         label = f"$FT_{{{self.var}}}$: rms = {s_rms:.2f} [{self.unit}]"
         
         ax0 = ax_array[0]
-        ax0.plot(self.f_fft_os, np.abs(self.fft_os), 'k', label=label)
+        if two_sided:
+            ax0.plot(self.f_fft_ts, np.abs(self.fft_ts), 'k', label=label)
+        else:
+            ax0.plot(self.f_fft_os, np.abs(self.fft_os), 'k', label=label)
         ax0.set_ylabel(f"$FT_{{{self.var}}}$ [{self.unit}]")
         ax0.legend()   
         ax0.grid(True, which='both')
@@ -636,7 +689,10 @@ class SingleChanSignal:
         ax0.set_title(f'Fourier transform {self.name}')
         
         if is_array:
-            ax_array[1].plot(self.f_fft_os, np.angle(self.fft_os), 'k', label=label)
+            if two_sided:
+                ax_array[1].plot(self.f_fft_ts, np.angle(self.fft_ts), 'k', label=label)
+            else:
+                ax_array[1].plot(self.f_fft_os, np.angle(self.fft_os), 'k', label=label)
             ax_array[1].set_ylabel(f"$\\phi_{{{self.var}}}$ [rad]")
             ax_array[1].grid(True, which='both')
             ax_array[1].minorticks_on()
@@ -772,7 +828,13 @@ class SingleChanSignal:
             The number of data points per segment for the STFT.
         hop : int, optional 
             The number of data points between segments.
-
+        flims : list, optional
+            The limits of the frequencies shown of the plot 
+        fig : optional 
+            Matplotlib figure handle
+        ax : optional
+            Matplotlib axis handle
+            
         Returns
         -------
         ax : matplotlib.axes.Axes
@@ -804,6 +866,7 @@ class SingleChanSignal:
     def plot_spectral_kurtosis(
         self,
         ax = None, 
+        Nfft:int = None,
         n_bins:int = None, 
         fl : int = None, 
         fu : int = None, 
@@ -816,6 +879,8 @@ class SingleChanSignal:
         ----------
         ax : matplotlib.axes.Axes, optional 
             The axes to plot on. If None, a new figure and axes are created.
+        Nfft : int, optional
+            Number of opints used to calculate the spectral kurtosis with the fast approach
         n_bins : int, optional 
             The number of bins for the spectral kurtosis calculation.
         fl : int, optional 
@@ -832,16 +897,18 @@ class SingleChanSignal:
         """
         if n_bins and fl and fu: 
             fvec, spectral_kurtosis = get_banded_spectral_kurtosis(self.x,self.dt,n_bins, fl, fu)
+        elif Nfft:
+            fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = Nfft, noverlap = Nfft//4)
         else: 
             fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = 2**10, noverlap = 2**8)
             
-        print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs/2:.1f} Hz')
+        print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs:.1f} Hz')
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 4))
         s_kur = self.central_moments['kurtosis']
         glob = 'global'
         label = f"$SK_{self.var}$(f): $kurt_{{{glob}}}$ = {s_kur:.2f} [-]"
-        ax.step(fvec*self.fs/2, spectral_kurtosis,'k',label=label, where = 'mid')
+        ax.step(fvec*self.fs, spectral_kurtosis,'k',label=label, where = 'mid')
         ax.set_xlabel("frequency [Hz]")
         ax.set_ylabel(f"$SK_{self.var}$ [-]")
         ax.legend()   
@@ -857,8 +924,10 @@ class SingleChanSignal:
     def plot_kurtogram(
         self,
         ax = None, 
-        n_bins:tuple = (10,100,10), 
-        ylims:list = None
+        n_bins: tuple|int = None, 
+        method: str = 'fast',
+        ylims:list = None,
+        xlims:list = None,
         ):
         """
         Plot the kurtogram of the signal.
@@ -877,22 +946,41 @@ class SingleChanSignal:
         ax : matplotlib.axes.Axes 
             The axes with the plotted kurtogram.
         """      
-        kurtogram, n_divisions, max_Nfft = self.get_kurtogram(n_bins = n_bins, _plot_call = True)
-        print(f'Plotting Kurtogram')
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 4), tight_layout=True)
-        freq_edges = np.linspace(0, self.fs / 2, max_Nfft + 1)
-        band_edges = np.append(n_divisions, n_divisions[-1] + (n_divisions[1] - n_divisions[0]))
-        FE, BE = np.meshgrid(np.flip(band_edges), freq_edges)
+        print(f'Plotting Kurtogram')
+        
+        if method == 'fast':
+            kurtogram, band_edges, max_Nfft, max_kurt, max_level, bw, fc = self.get_kurtogram(n_bins = n_bins, method = method, _plot_call = True)
+            title_str = (f'Kurtogram {self.name}\n'
+                r"$K_{max}$="
+                f"{max_kurt} @ level {max_level}, "
+                f"Bw={bw:.2f} Hz, $f_c$={fc:.2f} Hz"
+                )
+            kurtogram = kurtogram.transpose()
+            kurtogram = np.flip(kurtogram, axis = 1)
+        elif method == 'banded':    
+            kurtogram, n_divisions, max_Nfft = self.get_kurtogram(n_bins = n_bins, method = method, _plot_call = True)
+            # band_edges = np.log2(np.flip(np.append(n_divisions, n_divisions[-1] + 
+            #                        (n_divisions[1] - n_divisions[0]))))
+            band_edges = np.log2(np.flip(n_divisions))
+            kurtogram = np.flip(kurtogram, axis = 1)
+            title_str = f'Kurtogram {self.name}'
+            
+        freq_edges = np.linspace(0, self.fs / 2, max_Nfft)
+        FE, BE = np.meshgrid(band_edges, freq_edges)
         mesh = ax.pcolormesh(BE, FE, kurtogram, shading='auto')
         plt.gca().invert_yaxis()
         cbar = fig.colorbar(mesh, ax = ax)
         cbar.ax.set_ylabel('Spectral kurtosis')
         ax.set_xlabel('Frequency (Hz)')
-        ax.set_ylabel('Number of bands')
-        ax.set_title(f'Kurtogram {self.name}')
+        ax.set_ylabel('Level [log2(Window length)]')
+        ax.set_title(title_str)
         if ylims is not None:
             ax.set_ylim(ylims)
+        if xlims is not None:
+            ax.set_xlim(xlims)
+        plt.tight_layout()
         plt.show(block=False)
         return ax    
     
@@ -965,61 +1053,134 @@ class SingleChanSignal:
         ax : matplotlib.axes.Axes
             The axes with the plotted Hilbert transform.
         """
+        
         _, amplitude_envelope, instantaneous_phase = self.get_hilbert()
         print(f'Plotting Hilbert transform')
         instantaneous_frequency = np.diff(instantaneous_phase) / (2*np.pi) * self.fs
         time = self.t
         if ax is None:
             _, ax = plt.subplots(nrows=2, figsize=(10, 4), sharex='all', tight_layout=True)
+        ax_array = np.atleast_1d(ax)
+        is_array = len(ax_array) > 1
         ax[0].set_title(f"Hilbert transform {self.name}")
-        ax[0].set_ylabel(f"Amplitude [{self.unit}]")
+        ax[0].set_ylabel(f"SES [{self.unit}]")
         ax[0].plot(time, self.x, 'k', label=f'Signal')
         ax[0].plot(time, amplitude_envelope, 'r', label='Envelope')
         ax[0].legend()
         ax[0].grid(True,which = 'both')
         ax[0].minorticks_on() 
-        ax[1].set(xlabel="Time [s]", ylabel="Frequency [Hz]")
-        ax[1].plot(time[1:], abs(instantaneous_frequency), 'k', label = 'Instantaneous frequency')
-        ax[1].legend()
-        ax[1].grid(True,which = 'both')
-        ax[1].minorticks_on() 
+        if is_array:
+            ax[1].set(xlabel="Time [s]", ylabel="Frequency [Hz]")
+            ax[1].plot(time[1:], abs(instantaneous_frequency), 'k', label = 'Instantaneous frequency')
+            ax[1].legend()
+            ax[1].grid(True,which = 'both')
+            ax[1].minorticks_on() 
         plt.show(block=False)
         return ax
     
-    def _plot_hilbert_spectrum(self, ax = None): #! WIP
+    def plot_squared_envelope_spectrum(
+        self, 
+        ax = None, 
+        xlims:list = None,
+        ylims:list|str = None,
+        log:str = None
+        ):
         """
-        Plot the Hilbert spectrum of the signal, showing the amplitude and phase.
+        Plot the Squared Envelope Spectrum (SES) of the signal.
 
         Parameters
         ----------
         ax : matplotlib.axes.Axes, optional
             The axes to plot on. If None, a new figure and axes are created.
+        xlims : list, optional 
+            The limits for the x-axis.
+        ylims : list, optional 
+            The limits for the y-axis. Set 'auto' for automatic scaling on f>0
+        log : str, optional 
+            Specifies the logarithmic scale for x, y, or both axes.
 
         Returns
         -------
         ax : matplotlib.axes.Axes
-            The axes with the plotted Hilbert spectrum.
+            The axes with the plotted squared envelope spectrum.
         """
-        _, amplitude_envelope, instantaneous_phase = self.get_hilbert()
-        instantaneous_frequency = np.diff(instantaneous_phase,prepend=0) / (2*np.pi) * self.fs
-        h_spectrum =  np.fft.rfft(amplitude_envelope)/self.fs
-        freq = self.f_fft_os
+        ses, freq = self.get_squared_envelope_spectrum()
         if ax is None:
-            _, ax = plt.subplots(nrows=2, figsize=(10, 4), sharex='all', tight_layout=True)
-        ax[0].set_title(f"Hilbert spectrum {self.name}")
-        ax[0].set_ylabel(f"Amplitude [{self.unit}]")
-        ax[0].plot(freq, abs(h_spectrum), 'k')
-        ax[0].legend()
-        ax[0].grid(True,which = 'both')
-        ax[0].minorticks_on() 
-        ax[1].set(xlabel="Frequency [Hz]", ylabel="Phase [rad]")
-        ax[1].plot(freq, np.angle(h_spectrum), 'k')
-        # ax[1].legend()
-        ax[1].grid(True,which = 'both')
-        ax[1].minorticks_on() 
+            _, ax = plt.subplots(figsize=(10, 4), tight_layout=True)
+        ax.set_title(f"Squared Envelope Spectrum {self.name}")
+        ax.set_ylabel(f"Amplitude [({self.unit})$^4/Hz$]")
+        ax.plot(freq, abs(ses), 'k')
+        ax.legend()
+        ax.grid(True,which = 'both')
+        ax.minorticks_on() 
+        if ylims is not None:
+            if ylims == 'auto':
+                ax.set_ylim([0, 1.5*max(abs(ses[2:]))])
+            else:
+                ax.set_ylim(ylims)
+        if xlims is not None:
+            ax.set_xlim(xlims)
+        if log == "x":
+            ax.set_xscale("log")
+        elif log == "y":
+            ax.set_yscale("log")
+        elif log == "both":
+            ax.set_xscale("log")
+            ax.set_yscale("log") 
         plt.show(block=False)
         return ax
+    
+    def plot_squared_envelope_stft(
+        self, 
+        fig = None, 
+        ax = None, 
+        flims:list = None
+        ): #!WIP
+        """
+        Plot the Squared Envelope Spectrum (SES) of the signal.
+
+        Parameters
+        ----------
+        fig : matplotlib.axes.Figure, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        ax : matplotlib.axes.Axes, optional
+            The axes to plot on. If None, a new figure and axes are created.
+        flims : list, optional
+            Limits the frequency range on the plot.
+            
+        Returns
+        -------
+        ax : matplotlib.axes.Axes
+            The axes with the plotted squared envelope spectrum.
+        """
+        _, absolute_envelope, _ = self.get_hilbert()
+        se = absolute_envelope**2
+        nperseg:int = 2**10
+        hop = 2**5
+        w = sp.signal.windows.hann(nperseg)  
+        SFT = sp.signal.ShortTimeFFT(w, hop=hop, fs=self.fs, mfft=nperseg*2, scale_to='magnitude')
+        Sx = SFT.stft(se)
+        if ax is None and fig is None:
+            fig, ax = plt.subplots(figsize=(10, 4), sharex='all', tight_layout=True)
         
+        t_lo, t_hi = SFT.extent(self.N)[:2]  # time range of plot
+        ax.set_title(rf"SE Short time Fourier transform {self.name}")
+        ax.set(xlabel=f"Time [s] ({SFT.p_num(self.N)} slices, " +
+                    rf"$\Delta t = {SFT.delta_t:.3f}\,$s)",
+                ylabel=f"Frequency [Hz] ({SFT.f_pts} bins, " +
+                    rf"$\Delta f = {SFT.delta_f:.3f}\,$Hz)",
+                xlim=(t_lo, t_hi))
+
+        im1 = ax.imshow(abs(Sx), origin='lower', aspect='auto',
+                        extent=SFT.extent(self.N))
+        fig.colorbar(im1, label=f"Magnitude $|S_{self.var}(t, f)|$ [({self.unit})$^2$]")
+        if flims:
+            plt.ylim(flims)
+        plt.show(block=False)
+
+        return ax
+        
+    
     def plot_scalogram(self, ax = None, wavetype = 'morl', **kwargs):
         """
         Plot the scalogram of the signal using wavelet transformation.
