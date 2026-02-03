@@ -40,26 +40,26 @@ def test_invalid_psd_lengths():
 def test_beta_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_beta_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, mod_fun = get_beta_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "mod_fun" in mod_fun
 
 def test_rayleigh_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_rayleigh_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, mod_fun = get_rayleigh_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "mod_fun" in mod_fun
 
 def test_trapp_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_trapp_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, mod_fun = get_trapp_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "mod_fun" in mod_fun
 
 def test_frequency_modulation_output_shape(sample_psd_data):
     fpsd, psd, T ,fs = sample_psd_data
@@ -67,4 +67,4 @@ def test_frequency_modulation_output_shape(sample_psd_data):
     sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='fm', params=modulation_function, seed=42)
     assert isinstance(sig.x, np.ndarray)
     assert len(sig.x) > 0
-    assert "carrier" in sig.carrier
+    assert "mod_fun" in sig.mod_fun

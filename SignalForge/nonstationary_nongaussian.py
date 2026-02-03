@@ -8,39 +8,39 @@ from .single_chan_signal import SingleChanSignal
 
 '''
 supporting functions / 'static methods' (no need of self object)
-- get_beta_amplitude_modulation:            adds amplitude modulated non-stationarity to gaussian signal via beta distribution
-- get_rayleigh_amplitude_modulation:        adds amplitude modulated non-stationarity to gaussian signal via rayleigh distribution
-- get_trapp_amplitude_modulation:           adds amplitude modulated non-stationarity to gaussian signal via gaussian distribution
-- get_frequency_modulation:                 designes frequency modulate non-stationary process from given carrier function and starting psd
+- get_beta_amplitude_modulation:            adds amplitude modulated non-stationarity to stationary signal via beta distribution
+- get_rayleigh_amplitude_modulation:        adds amplitude modulated non-stationarity to stationary signal via rayleigh distribution
+- get_trapp_amplitude_modulation:           adds amplitude modulated non-stationarity to stationary signal via gaussian distribution
+- get_frequency_modulation:                 designes frequency modulate non-stationary process from given modulating function and starting psd
 '''
 
-def _add_am_carrier(noise:np.ndarray, carrier:np.ndarray):
+def _add_amp_mod(carrier:np.ndarray, modulation:np.ndarray):
     """
-    private function for adding amplitude modulation carrier to gaussian noise standardizing rms to the noise 
+    private function for adding amplitude modulation function to stationary noise (carrier) standardizing rms to the carrier 
     """
-    nonstat_sign = noise*carrier
-    rms_correction = np.std(noise) / np.std(nonstat_sign)
+    nonstat_sign = carrier*modulation
+    rms_correction = np.std(carrier) / np.std(nonstat_sign)
     nonstat_sign = nonstat_sign * rms_correction
     return nonstat_sign
 
 def _oneband_am_opt_fun(
     params:list, 
-    gauss_signal:np.ndarray, 
+    carrier:np.ndarray, 
     time_vector:np.ndarray, 
-    carrier_fun:np.ndarray, 
+    modulation_fun:np.ndarray, 
     input_kurtosis:float, 
     seed:int
     ):
     """
     optimization function for oneband ampiltude modulated non stationary signals
     """
-    carrier = carrier_fun(*params, time_vector, seed)
-    nonstat_sign = _add_am_carrier(gauss_signal, carrier)
+    modulation = modulation_fun(*params, time_vector, seed)
+    nonstat_sign = _add_amp_mod(carrier, modulation)
     transformed_kurtosis = sp.stats.kurtosis(nonstat_sign) + 3
     return np.abs(transformed_kurtosis - input_kurtosis)
 
 def _get_banded_am_opt(
-    gauss_signal:np.ndarray, 
+    carrier:np.ndarray, 
     T:float, 
     input_kurtosis:float, 
     flims:list, 
@@ -51,38 +51,38 @@ def _get_banded_am_opt(
     """
     optimization function for multiband ampiltude modulated non stationary signals
     """
-    time_vector = np.linspace(0,1,len(gauss_signal))*T
-    fs = T/len(gauss_signal)
+    time_vector = np.linspace(0,1,len(carrier))*T
+    fs = T/len(carrier)
     Nfw = len(input_kurtosis)
     flims = np.linspace(flims[0],flims[1],Nfw+1)
-    fft_os = np.fft.rfft(gauss_signal)/fs
-    fvec = np.fft.rfftfreq(len(gauss_signal), fs)
-    nonstat_sign = np.zeros(len(gauss_signal))
-    carrier = np.zeros((Nfw,len(gauss_signal)))
+    fft_os = np.fft.rfft(carrier)/fs
+    fvec = np.fft.rfftfreq(len(carrier), fs)
+    nonstat_sign = np.zeros(len(carrier))
+    modulation = np.zeros((Nfw,len(carrier)))
     for i in tqdm(range(Nfw)):
         Xos_win = np.zeros(len(fft_os), dtype=np.complex_)
         fwindow = (fvec >= flims[i]) & (fvec < flims[i+1])
         Xos_win[fwindow] = fft_os[fwindow]
         banded_signal = np.fft.irfft(Xos_win*fs)
         optim_res = sp.optimize.minimize(_oneband_am_opt_fun, args = (banded_signal, time_vector, amplitude_modulation_fun, input_kurtosis[i], seed),**opt_settings)
-        carrier[i,:] = amplitude_modulation_fun(*optim_res.x, time_vector, seed)
-        nonstat_sign += _add_am_carrier(banded_signal, carrier[i,:])
-    return nonstat_sign, carrier
+        modulation[i,:] = amplitude_modulation_fun(*optim_res.x, time_vector, seed)
+        nonstat_sign += _add_amp_mod(banded_signal, modulation[i,:])
+    return nonstat_sign, modulation
 
 def get_beta_amplitude_modulation(
-    gauss_signal: np.ndarray, 
+    carrier: np.ndarray, 
     T: float, 
     input_kurtosis: float, 
     flims: list = None, 
     seed : int = None
     ):
     """
-    Apply beta-distributed amplitude modulation to a Gaussian signal.
+    Apply beta-distributed amplitude modulation to a stationary signal.
 
     Parameters
     ----------
-        gauss_signal : array-like 
-            Input Gaussian signal.
+        carrier : array-like 
+            Input stationary signal.
         T : float
             Signal duration in seconds.
         input_kurtosis : float or array-like 
@@ -96,17 +96,17 @@ def get_beta_amplitude_modulation(
     -------
         nonstat_signal : np.ndarray
             Non stationary resulting signal
-        carrier : dict
-            Dictionary containing "name" of carrier and "carrier" time history 
+        mod_fun : dict
+            Dictionary containing "name" of modulating function and "mod_fun" time history 
         
     
     Source
     ------
     D. Smallwood, «Vibration with Non-Gaussian Noise», J. IEST, vol. 52, fasc. 2, pp. 13–30, ott. 2009, doi: 10.17764/jiet.52.2.gh0444564n8765k1.
     """
-    def get_beta_carrier(alpha, Ntw, time_vector, seed = None):
+    def get_beta_modulation(alpha, Ntw, time_vector, seed = None):
         """
-        Generate a beta-distributed amplitude modulation carrier.
+        Generate a beta-distributed amplitude modulation function.
 
         Parameters:
             alpha : float 
@@ -119,8 +119,8 @@ def get_beta_amplitude_modulation(
                 Seed for reproducibility.
 
         Returns:
-            carrier : array-like 
-                Normalized amplitude modulation carrier.
+            beta_modulation : array-like 
+                Normalized amplitude modulation modulating function.
         """   
         beta = alpha
         t_mod = np.linspace(0,max(time_vector), round(Ntw))
@@ -130,45 +130,46 @@ def get_beta_amplitude_modulation(
         beta_points[[-1,0]] = 0
         np.random.seed(seed=None)
         spline_interpolator = sp.interpolate.CubicSpline(t_mod, beta_points)
-        beta_carrier = spline_interpolator(time_vector)/np.max(beta_points)   
-        return beta_carrier
+        beta_modulation = spline_interpolator(time_vector)/np.max(beta_points)   
+        return beta_modulation
+    
     if np.isscalar(input_kurtosis):
-        time_vector = np.linspace(0,1,len(gauss_signal))*T
+        time_vector = np.linspace(0,1,len(carrier))*T
         optim_res = sp.optimize.minimize(
             _oneband_am_opt_fun, 
-            args = (gauss_signal, time_vector, get_beta_carrier, input_kurtosis, seed), 
+            args = (carrier, time_vector, get_beta_modulation, input_kurtosis, seed), 
             x0=[1,40], 
-            bounds=[(0.1,5), (30,len(gauss_signal)//2)]
+            bounds=[(0.1,5), (30,len(carrier)//2)]
             )
-        carrier = get_beta_carrier(*optim_res.x, time_vector, seed)
-        nonstat_sign = _add_am_carrier(gauss_signal, carrier)
-        carrier = [carrier]
+        mod_fun = get_beta_modulation(*optim_res.x, time_vector, seed)
+        nonstat_sign = _add_amp_mod(carrier, mod_fun)
+        mod_fun = [mod_fun]
     else:
-        opt_settings = {'x0':[1,40], 'bounds':[(0.5,5), (30,len(gauss_signal)//2)]}
-        nonstat_sign, carrier = _get_banded_am_opt(
-            gauss_signal, 
+        opt_settings = {'x0':[1,40], 'bounds':[(0.5,5), (30,len(carrier)//2)]}
+        nonstat_sign, mod_fun = _get_banded_am_opt(
+            carrier, 
             T, 
             input_kurtosis, 
             flims, 
-            get_beta_carrier, 
+            get_beta_modulation, 
             seed, 
             opt_settings)
-    return nonstat_sign, {'name': 'Beta amplitude modulation [-]', 'carrier': carrier}
+    return nonstat_sign, {'name': 'Beta amplitude modulation [-]', 'mod_fun': mod_fun}
 
 def get_rayleigh_amplitude_modulation(
-    gauss_signal: np.ndarray, 
+    carrier: np.ndarray, 
     T: float, 
     input_kurtosis: float, 
     flims: list = None, 
     seed: int = None
     ):
     """
-    Apply Rayleigh-distributed amplitude modulation to a Gaussian signal.
+    Apply Rayleigh-distributed amplitude modulation to a stationary signal.
 
     Parameters
     ----------
-        gauss_signal : array-like
-            Input Gaussian signal.
+        carrier : array-like
+            Input stationary signal.
         T : float 
             Signal duration in seconds.
         input_kurtosis : float or array-like 
@@ -182,16 +183,16 @@ def get_rayleigh_amplitude_modulation(
     -------
         nonstat_signal : np.ndarray
             Non stationary resulting signal
-        carrier : dict
-            Dictionary containing "name" of carrier and "carrier" time history 
+        mod_fun : dict
+            Dictionary containing "name" of modulation function and "mod_fun" time history 
         
     Source
     ------
     D. Smallwood, «Vibration with Non-Gaussian Noise», J. IEST, vol. 52, fasc. 2, pp. 13–30, ott. 2009, doi: 10.17764/jiet.52.2.gh0444564n8765k1.
     """   
-    def get_ray_carrier(sigma, Ntw, time_vector, seed = None):   
+    def get_ray_modulation(sigma, Ntw, time_vector, seed = None):   
         """
-        Generate a Rayleigh-distributed amplitude modulation carrier.
+        Generate a Rayleigh-distributed amplitude modulation function.
 
         Parameters:
             sigma : float 
@@ -204,8 +205,8 @@ def get_rayleigh_amplitude_modulation(
                 Seed for reproducibility.
 
         Returns:
-            carrier : array-like 
-                Normalized amplitude modulation carrier.
+            ray_modulation : array-like 
+                Normalized amplitude modulation function.
         """
         t_mod = np.linspace(0,max(time_vector), round(Ntw))
         if seed: np.random.seed(seed=seed)
@@ -213,40 +214,40 @@ def get_rayleigh_amplitude_modulation(
         ray_points[[-1,0]] = 0
         np.random.seed(seed=None)
         spline_interpolator = sp.interpolate.CubicSpline(t_mod, ray_points)
-        ray_carrier = spline_interpolator(time_vector)/np.max(ray_points)   
-        return ray_carrier
+        ray_modulation = spline_interpolator(time_vector)/np.max(ray_points)   
+        return ray_modulation
     
     if np.isscalar(input_kurtosis):
-        time_vector = np.linspace(0,1,len(gauss_signal))*T
+        time_vector = np.linspace(0,1,len(carrier))*T
         optim_res = sp.optimize.minimize(
             _oneband_am_opt_fun, 
-            args = (gauss_signal, time_vector, get_ray_carrier, input_kurtosis, seed),
+            args = (carrier, time_vector, get_ray_modulation, input_kurtosis, seed),
             x0=[2,40], 
-            bounds=[(0.1,10), (30,len(gauss_signal)//2)]
+            bounds=[(0.1,10), (30,len(carrier)//2)]
             )
-        carrier = get_ray_carrier(*optim_res.x, time_vector, seed)
-        nonstat_sign = _add_am_carrier(gauss_signal, carrier)
-        carrier = [carrier]
+        mod_fun = get_ray_modulation(*optim_res.x, time_vector, seed)
+        nonstat_sign = _add_amp_mod(carrier, mod_fun)
+        mod_fun = [mod_fun]
     else:
         if flims is None: raise KeyError('Parameter "flims" must be defined to get a specified spectral kurtosis')
-        opt_settings  = {'x0':[2,40], 'bounds':[(0.1,10), (30,len(gauss_signal)//2)]}
-        nonstat_sign, carrier = _get_banded_am_opt(gauss_signal, T, input_kurtosis, flims, get_ray_carrier, seed, opt_settings)
-    return nonstat_sign, {'name': 'Rayleigh amplitude modulation [-]', 'carrier': carrier}
+        opt_settings  = {'x0':[2,40], 'bounds':[(0.1,10), (30,len(carrier)//2)]}
+        nonstat_sign, mod_fun = _get_banded_am_opt(carrier, T, input_kurtosis, flims, get_ray_modulation, seed, opt_settings)
+    return nonstat_sign, {'name': 'Rayleigh amplitude modulation [-]', 'mod_fun': mod_fun}
 
 def get_trapp_amplitude_modulation(
-    gauss_signal: np.ndarray, 
+    carrier: np.ndarray, 
     T: float, 
     input_kurtosis:float, 
     flims:list = None, 
     seed : int = None
     ): # TODO: ADD MULTIBAND MODULATION
     """
-    Apply Gaussian-envelope-based amplitude modulation using a transformed power-law Rayleigh carrier.
+    Apply Gaussian-envelope-based amplitude modulation using a transformed power-law Rayleigh modulating function.
 
     Parameters
     ----------
-        gauss_signal : array-like 
-            Input Gaussian signal.
+        carrier : array-like 
+            Input stationary signal.
         T : float 
             Duration in seconds.
         input_kurtosis : float 
@@ -260,21 +261,21 @@ def get_trapp_amplitude_modulation(
     -------
         nonstat_signal : np.ndarray
             Non stationary resulting signal
-        carrier : dict
-            Dictionary containing "name" of carrier and "carrier" time history     
+        mod_fun : dict
+            Dictionary containing "name" of modulation function and "mod_fun" time history     
     Source
     ------
     A. Trapp, M. J. Makua, e P. Wolfsteiner, «Fatigue assessment of amplitude-modulated non-stationary random vibration loading», Procedia Struct. Integr., vol. 17, pp. 379–386, 2019, doi: 10.1016/j.prostr.2019.08.050.
     """
     def get_trapp_carrier(p, delta_m, gaussian_carier): 
-        """Generate amplitude modulation carrier based on power-law transformation."""  
+        """Generate amplitude modulation function based on power-law transformation."""  
         ray_carrier = np.abs(gaussian_carier)**p+delta_m
         return ray_carrier
     
     def trapp_am_opt_fun(params, gauss_carrier, input_kurtosis):
         """Optimization objective: match output signal kurtosis and reduce skew."""
-        carrier = get_trapp_carrier(*params, gaussian_carier=gauss_carrier)
-        nonstat_sign = _add_am_carrier(gauss_signal, carrier)
+        mod_fun = get_trapp_carrier(*params, gaussian_carier=gauss_carrier)
+        nonstat_sign = _add_amp_mod(carrier, mod_fun)
         transformed_kurtosis = sp.stats.kurtosis(nonstat_sign) + 3
         transformed_skew = sp.stats.skew(nonstat_sign)
         return np.abs(transformed_kurtosis - input_kurtosis)+np.abs(transformed_skew)
@@ -282,7 +283,7 @@ def get_trapp_amplitude_modulation(
     if flims: 
         raise UserWarning('Multiband amplitude modulation not implemented yet for this method.')
     if seed: np.random.seed(seed=seed)
-    fs = len(gauss_signal)/T
+    fs = len(carrier)/T
     fpsd = np.array([0,.2,.3,.4,.5,fs/2])
     psd = np.array([0,0,1,1,0,0])*2/(fpsd[4]+fpsd[3]-fpsd[2]-fpsd[1])
     _,gauss_carrier = get_stationary_gaussian(fpsd, psd, T, seed = None)
@@ -295,15 +296,15 @@ def get_trapp_amplitude_modulation(
             x0=[2,0], 
             bounds=[(0.1,100), (0,10)]
             )
-        carrier = get_trapp_carrier(*optim_res.x, gaussian_carier = gauss_carrier)
-        nonstat_sign = _add_am_carrier(gauss_signal, carrier)
-        carrier = [carrier]
+        mod_fun = get_trapp_carrier(*optim_res.x, gaussian_carier = gauss_carrier)
+        nonstat_sign = _add_amp_mod(carrier, mod_fun)
+        mod_fun = [mod_fun]
     # else:
     #     if flims is None: raise KeyError('Parameter "flims" must be defined to get a specified spectral kurtosis')
     #     opt_settings  = {'x0':[2,0], 'bounds':[(0.1,100), (0,10)]}
-    #     nonstat_sign = _get_banded_am_opt(gauss_signal, T, input_kurtosis, flims, get_trapp_carrier, seed, opt_settings)
+    #     nonstat_sign = _get_banded_am_opt(carrier, T, input_kurtosis, flims, get_trapp_carrier, seed, opt_settings)
     
-    return nonstat_sign, {'name': 'Gaussian amplitude modulation [-]', 'carrier': carrier}
+    return nonstat_sign, {'name': 'Gaussian amplitude modulation [-]', 'mod_fun': mod_fun}
 
 def get_frequency_modulation(
     Sx:np.ndarray,
@@ -326,8 +327,8 @@ def get_frequency_modulation(
     -------
         nonstat_signal : np.ndarray
             Non stationary resulting signal
-        carrier : dict
-            Dictionary containing "name" of carrier and "carrier" time history 
+        mod_fun : dict
+            Dictionary containing "name" of modulation funcrion and "mod_fun" time history 
     Source
     ------
     M. Clerc e S. Mallat, «Estimating deformations of stationary processes», Ann. Stat., vol. 31, fasc. 6, dic. 2003, doi: 10.1214/aos/1074290327.
@@ -347,11 +348,11 @@ def get_frequency_modulation(
         Sx_mag_modulated[:,i] = np.roll(base_fft_window, round(nf))[np.size(Sx,0):2*np.size(Sx,0)]              
     Sx_modulated = Sx_mag_modulated*np.exp(1j * Sx_angle)
     nonstat_sign = SFT.istft(Sx_modulated)
-    carrier = np.interp(
+    mod_fun = np.interp(
         np.linspace(0,1,len(nonstat_sign)),
         np.linspace(0,1,len(modulation_function)), 
         modulation_function)
-    return nonstat_sign, {'name': 'Frequency shift [Hz]', 'carrier': [carrier]}
+    return nonstat_sign, {'name': 'Frequency shift [Hz]', 'mod_fun': [mod_fun]}
 
 
 class NonStationaryNonGaussian(SingleChanSignal):
@@ -417,7 +418,7 @@ class NonStationaryNonGaussian(SingleChanSignal):
         self.dfpsd = dfpsd
         self.fpsd,self.psd = interps[interp](fpsd, psd, n_points = int(fpsd[-1]/dfpsd), fs = self.fs) 
         self.T = T
-        self.x, self.carrier = self._get_nonstationary_timehistory(method = method, params = params, seed_gauss = seed)
+        self.x, self.mod_fun = self._get_nonstationary_timehistory(method = method, params = params, seed_gauss = seed)
         self.signal_type = f'Nonstationary - NonGaussian ({method})'
         super().__init__(
             x = self.x, 
@@ -455,10 +456,10 @@ class NonStationaryNonGaussian(SingleChanSignal):
             seed_gauss : int, optional 
                 Seed for Gaussian signal.
             seed_mod : int, optional
-                Seed for modulation carrier.
+                Seed for modulation function.
     
         Returns:
-            tuple: Non-stationary signal and modulation carrier info.
+            tuple: Non-stationary signal and modulation modulation function info.
         """
         stationary_gaussian_signal = self._get_gaussian_timehistory(seed = seed_gauss)
         methods = {'beta_am': get_beta_amplitude_modulation,
@@ -473,18 +474,18 @@ class NonStationaryNonGaussian(SingleChanSignal):
             nperseg = round(self.fs/2/self.dfpsd)
             self.x = stationary_gaussian_signal
             Sx, SFT = self.get_sftf(nperseg = nperseg, hop = nperseg//2, nargout=2)
-            nonstationary_signal, carrier = methods[method](Sx, SFT, modulation_function = params)  
+            nonstationary_signal, mod_fun = methods[method](Sx, SFT, modulation_function = params)  
         else:
-            nonstationary_signal, carrier = methods[method](stationary_gaussian_signal, self.T, **params, seed=seed_mod)  
+            nonstationary_signal, mod_fun = methods[method](stationary_gaussian_signal, self.T, **params, seed=seed_mod)  
         
         output_skewness = sp.stats.skew(nonstationary_signal)
         output_kurtosis = sp.stats.kurtosis(nonstationary_signal)+3
         print(f'Non-stationary signal generated with "{method}" method: skew = {output_skewness:.1f}, kurt = {output_kurtosis:.1f}')
-        return nonstationary_signal, carrier
+        return nonstationary_signal, mod_fun
     
-    def plot_carrier(self, ax = None, ylims = None, xlims = None):
+    def plot_modulating(self, ax = None, ylims = None, xlims = None):
         """
-        Plot the modulation carrier used to transform the Gaussian signal.
+        Plot the modulation function used to transform the stationary signal.
         Parameters
         ----------
             ax : matplotlib.axes.Axes, optional
@@ -497,20 +498,56 @@ class NonStationaryNonGaussian(SingleChanSignal):
         Returns
         -------
             ax : matplotlib.axes.Axes
-                The axes with the plotted carrier.
+                The axes with the plotted modulation function.
         """
         print(f'Plotting Timehistory')
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 4))
-        color_list = ['k']+[f'C{i:d}' for i in range(len(self.carrier['carrier']))]
-        for i, band_carrier in enumerate(self.carrier['carrier']):
-            ax.plot(self.t,band_carrier,color_list[i], label = f"Carrier n.{i+1}")
+        color_list = ['k']+[f'C{i:d}' for i in range(len(self.mod_fun['mod_fun']))]
+        for i, band_carrier in enumerate(self.mod_fun['mod_fun']):
+            ax.plot(self.t,band_carrier,color_list[i], label = f"Modulating n.{i+1}")
         ax.set_xlabel("Time [s]")
-        ax.set_ylabel(self.carrier['name'])  
+        ax.set_ylabel(self.mod_fun['name'])  
         ax.legend() 
         ax.grid(True,which = 'both')
         ax.minorticks_on()   
-        ax.set_title(f'Carrier function {self.name}')
+        ax.set_title(f'Modulation function {self.name}')
+        if xlims is not None:
+            ax.set_xlim(xlims)
+        if ylims is not None:
+            ax.set_ylim(ylims)
+        return ax
+    
+    def plot_modulating_ft(self, ax = None, ylims = None, xlims = None):
+        """
+        Plot the DFT of the modulation function used to transform the Gaussian signal.
+        
+        Parameters
+        ----------
+            ax : matplotlib.axes.Axes, optional
+                Axis to plot on. Creates a new one if None.
+            ylims : tuple, optional 
+                y-axis limits.
+            xlims : tuple, optional 
+                x-axis limits.
+        
+        Returns
+        -------
+            ax : matplotlib.axes.Axes
+                The axes with the plotted modulaiting function.
+        """
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 4))
+        color_list = ['k']+[f'C{i:d}' for i in range(len(self.mod_fun['mod_fun']))]
+        for i, band_carrier in enumerate(self.mod_fun['mod_fun']):
+            h_spectrum =  np.fft.rfft(band_carrier)/self.fs
+            ax.plot(self.f_fft_os,np.abs(h_spectrum),color_list[i], label = f"Modulating n.{i+1}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel(self.mod_fun['name'])  
+        ax.legend() 
+        ax.grid(True,which = 'both')
+        ax.minorticks_on()   
+        ax.set_title(f'Modulation function {self.name}')
         if xlims is not None:
             ax.set_xlim(xlims)
         if ylims is not None:
