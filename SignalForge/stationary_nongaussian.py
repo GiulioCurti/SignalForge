@@ -780,6 +780,7 @@ class StationaryNonGaussian(SingleChanSignal):
         psd: np.ndarray,
         T: float,
         kurtosis: int,
+        flims: list = None,
         fs : float = None,
         dfpsd: float = 0.5,
         skewness: int = 0,
@@ -816,13 +817,23 @@ class StationaryNonGaussian(SingleChanSignal):
             self.fs = fs
 
         # Generate the non-Gaussian signal
-        self.transform_params, self.x = self._get_nongaussian_timehistory(
-            seed=seed,
-            method=method,
-            skewness=skewness,
-            kurtosis=kurtosis,
-            params=params
-        )
+        if not np.isscalar(kurtosis):
+            self.transform_params, self.x = self._get_banded_nongaussian_timehistory(
+                seed=seed,
+                method=method,
+                skewness=skewness,
+                kurtosis=kurtosis,
+                flims = flims
+            )
+        else:
+            self.transform_params, self.x = self._get_nongaussian_timehistory(
+                seed=seed,
+                method=method,
+                skewness=skewness,
+                kurtosis=kurtosis,
+                params=params
+            )
+
 
         self.signal_type = f'Stationary - NonGaussian ({method})'
 
@@ -836,6 +847,20 @@ class StationaryNonGaussian(SingleChanSignal):
             signal_type=self.signal_type
         )
 
+    def get_existing_methods(self):
+        # Define transformation methods
+        methods = {
+            'winter': get_winterstein,
+            'cubic': get_cubic_polinomial,
+            'zheng': get_zheng,
+            'sarkani': get_sarkani,
+            'zmnl': get_zmnl,
+            'steinwolf': get_steinwolf,
+            'smallwood': get_smallwood,
+            'vanbaren': get_vanbaren
+            }
+        return methods
+    
     def _get_gaussian_timehistory(self, seed=None) -> np.ndarray:
         """
         Internal function called by __init__
@@ -850,7 +875,7 @@ class StationaryNonGaussian(SingleChanSignal):
         """
         _, signal = get_stationary_gaussian(self.fpsd, self.psd, self.T, fs = self.fs, seed = seed, interp= self._interp)
         return signal
-
+    
     def _get_nongaussian_timehistory(
         self,
         skewness: float,
@@ -869,17 +894,7 @@ class StationaryNonGaussian(SingleChanSignal):
         # Generate Gaussian signal
         gaussian_signal = self._get_gaussian_timehistory(seed=seed)
 
-        # Define transformation methods
-        methods = {
-            'winter': get_winterstein,
-            'cubic': get_cubic_polinomial,
-            'zheng': get_zheng,
-            'sarkani': get_sarkani,
-            'zmnl': get_zmnl,
-            'steinwolf': get_steinwolf,
-            'smallwood': get_smallwood,
-            'vanbaren': get_vanbaren
-        }
+        methods = self.get_existing_methods()
 
         # Validate method
         method_existance_check(method, methods)
@@ -924,6 +939,69 @@ class StationaryNonGaussian(SingleChanSignal):
 
         return opt_params, signal       
 
+    def _get_banded_nongaussian_timehistory(
+        self,
+        skewness: float,
+        kurtosis: list,
+        flims: list = None,
+        method: str = 'winter',
+        seed: int =None
+        ):
+        
+        methods = self.get_existing_methods()
+        
+        # Generate Gaussian signal
+        gaussian_signal = self._get_gaussian_timehistory(seed=seed)
+        
+        if flims is None:
+            flims = [0, self.fs]
+            
+        print(
+            f'Estimating banded non-Gaussian signal from parameters '
+            f'(skew = {skewness}, kurtosis = {kurtosis}) between {flims[0]} Hz and {flims[1]} Hz using "{method}" method.'
+        )
+        
+        n_bands = len(kurtosis)
+        f_incr = (flims[1]-flims[0])/n_bands
+        fl_vector = np.arange(0,n_bands)*f_incr + flims[0]
+        
+        out_signal = np.zeros(len(gaussian_signal))
+        opt_params = []
+        
+        for fl, kurt in zip(fl_vector, kurtosis):
+            fu = fl+f_incr
+            if method in ['zmnl', 'steinwolf']:
+                filt_gaussian_signal = perfect_passband_filter(gaussian_signal, fl_n = fl/self.fs, fu_n = fu/self.fs)
+                signal, band_opt_params = methods[method](
+                    filt_gaussian_signal,
+                    input_skewness=skewness,
+                    input_kurtosis=kurt,
+                    fs=self.fs
+                )
+            elif method in ['vanbaren', 'smallwood']:
+                filtered_psd = np.zeros(len(self.psd))
+                mask = (self.fpsd>fl) & (self.fpsd<(fl+f_incr))
+                filtered_psd[mask] = self.psd[mask]
+                signal, band_opt_params = methods[method](
+                    self.fpsd,
+                    filtered_psd,
+                    self.T,
+                    input_skewness=skewness,
+                    
+                    input_kurtosis=kurt
+                )
+            else:
+                filt_gaussian_signal = perfect_passband_filter(gaussian_signal, fl/self.fs, fu/self.fs)
+                signal, band_opt_params = methods[method](
+                    filt_gaussian_signal,
+                    input_skewness=skewness,
+                    input_kurtosis=kurt
+                )
+            print(f'Band generated (range {fl}-{fu} Hz) with kurt = {sp.stats.kurtosis(signal)+3:.2f} (expected {kurt})')
+            out_signal += signal
+            opt_params.append(band_opt_params) 
+        
+        return opt_params, out_signal
 
 if __name__ == "__main__":
     pass

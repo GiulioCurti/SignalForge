@@ -989,3 +989,21 @@ def gaussian_bell(grid, var, mean = 0):
     Squires, G. L. (2001-08-30). Practical Physics (4 ed.). Cambridge University Press. doi:10.1017/cbo9781139164498. ISBN 978-0-521-77940-1.
     """
     return 1/ np.sqrt(var*2*np.pi) * np.exp(-(grid-mean)**2 / (2 * var))
+
+def perfect_passband_filter(signal, fl_n, fu_n):
+    """_summary_
+
+    Args:
+        signal (_type_): timehistory
+        fl_n (_type_): low frequency given normalized against the sampling frequency
+        fu_n (_type_): low frequency given normalized against the sampling frequency
+    """
+    fft_os = np.fft.rfft(signal)
+    f_fft_os = np.fft.rfftfreq(signal.size)
+    mask = (np.abs(f_fft_os)>fl_n) & (np.abs(f_fft_os)<fu_n)
+    filtered_fft = np.zeros(len(fft_os), dtype=complex)
+    filtered_fft[mask] = fft_os[mask]
+    filtered_signal = np.fft.irfft(filtered_fft)
+    return filtered_signal
+    
+    
