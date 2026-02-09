@@ -450,72 +450,56 @@ def get_welch_spectral_kurtosis(x:np.ndarray, Nfft:int, noverlap:int = None):
 
     return f_norm[:Nfft//2], SK[:Nfft//2]
 
-def fast_kurtogram(x, fs, nlevel=7,plot=False):
+def fast_kurtogram(x, fs, nlevel=7):
     '''
     Fast Kurtogram computation
-    ===========================================================================
     
-    Input parameters:
-    --------------------------
-    x       : input signal (1D array)
-    nlevel  : number of decomposition levels (Maximum number of decomposition levels is log2(length(x)), but it is recommended to stay by a factor 1/8 below this.)
-    fs      : sampling frequency of signal x (default is Fs = 1)
-    plot    : boolean to enable/disable plotting of results (default is False)
-    ===========================================================================
-    Output parameters:
-    --------------------------
-    Output parameters:
-    --------------------------
-    Kwav        : 2D ndarray of shape (2 * nlevel, 3 * 2**nlevel)
-                  Kurtosis map (Fast Kurtogram). Each entry Kwav[i, j]
-                  is the envelope kurtosis of the sub-band corresponding
-                  to level Level_w[i] and center frequency freq_w[j].
+    Parameters:
+        x       : input signal (1D array)
+        nlevel  : number of decomposition levels (Maximum number of decomposition levels is log2(length(x)), but it is recommended to stay by a factor 1/8 below this.)
+        fs      : sampling frequency of signal x (default is Fs = 1)
+        plot    : boolean to enable/disable plotting of results (default is False)
 
-    Level_w     : 1D ndarray of length 2 * nlevel
-                  Effective decomposition levels associated with each row
-                  of Kwav. It contains both binary and ternary levels,
-                  ordered as in the original MATLAB implementation
-                  (top row = level 0).
+    Output:
+        Kwav        : 2D ndarray of shape (2 * nlevel, 3 * 2**nlevel)
+                    Kurtosis map (Fast Kurtogram). Each entry Kwav[i, j]
+                    is the envelope kurtosis of the sub-band corresponding
+                    to level Level_w[i] and center frequency freq_w[j].
 
-    freq_w      : 1D ndarray of length 3 * 2**nlevel
-                  Center frequencies [Hz] of each sub-band along the
-                  horizontal axis (columns) of Kwav.
+        Level_w     : 1D ndarray of length 2 * nlevel
+                    Effective decomposition levels associated with each row
+                    of Kwav. It contains both binary and ternary levels,
+                    ordered as in the original MATLAB implementation
+                    (top row = level 0).
 
-    fc          : float
-                  Optimal center frequency [Hz] corresponding to the
-                  maximum kurtosis in Kwav (i.e. frequency of the most
-                  impulsive band).
+        freq_w      : 1D ndarray of length 3 * 2**nlevel
+                    Center frequencies [Hz] of each sub-band along the
+                    horizontal axis (columns) of Kwav.
 
-    bandwidth   : float
-                  Bandwidth [Hz] of the optimal sub-band associated with fc.
+        fc          : float
+                    Optimal center frequency [Hz] corresponding to the
+                    maximum kurtosis in Kwav (i.e. frequency of the most
+                    impulsive band).
 
-    max_kurt    : float
-                  Maximum kurtosis value found in Kwav.
+        bandwidth   : float
+                    Bandwidth [Hz] of the optimal sub-band associated with fc.
 
-    level_max   : float
-                  Effective decomposition level (in Level_w) at which the
-                  maximum kurtosis max_kurt occurs.
+        max_kurt    : float
+                    Maximum kurtosis value found in Kwav.
 
-    c           : 1D ndarray
-                  Signal filtered in the optimal sub-band (center frequency fc
-                  and bandwidth bandwidth). This is the band-limited signal
-                  typically used for further analysis (e.g., envelope analysis
-                  and envelope spectrum for fault detection).
+        level_max   : float
+                    Effective decomposition level (in Level_w) at which the
+                    maximum kurtosis max_kurt occurs.
+
+        c           : 1D ndarray
+                    Signal filtered in the optimal sub-band (center frequency fc
+                    and bandwidth bandwidth). This is the band-limited signal
+                    typically used for further analysis (e.g., envelope analysis
+                    and envelope spectrum for fault detection).
+    References:
+        J. Antoni, Fast Computation of the Kurtogram for the Detection of Transient Faults, Mechanical Systems and Signal Processing, Volume 21, Issue 1, 2007, pp.108-124.
+    
     '''
-    # % Fast_Kurtogram(x,nlevel,Fs)
-    # % Computes the fast kurtogram of signal x up to level 'nlevel' via a fast decimated filterbank tree.
-    # % Maximum number of decomposition levels is log2(length(x)), but it is 
-    # % recommended to stay by a factor 1/8 below this.
-    # % Fs = sampling frequency of signal x (default is Fs = 1)
-    # %
-    # % --------------------------
-    # % Reference: J. Antoni, Fast Computation of the Kurtogram for the Detection of Transient Faults, 
-    # % Mechanical Systems and Signal Processing, Volume 21, Issue 1, 2007, pp.108-124.
-    # % --------------------------
-    # % Author: J. Antoni
-    # % Last Revision: 12-2014
-    # % Last Translation: 12-2025 (Python 3.11.0)
-    # % --------------------------
     
     firwin = sp.signal.firwin
     lfilter = sp.signal.lfilter

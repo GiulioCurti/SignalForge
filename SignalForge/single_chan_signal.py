@@ -478,7 +478,110 @@ class SingleChanSignal:
             
         else:
             raise ValueError('Method not implemented. Try with "fast" or "banded"')
+    
+    def get_wigner_ville(self, n_points:int = None, n_freq_bins:int = None, win_filt:bool = False):
+        """
+        Compute basic (unsmoothed) Wigner-Ville distribution.
+        
+        High resolution but exhibits cross-term interference for multi-component signals.
+        
+        Parameters:
+        -----------
+        n_points : int or None
+            Number of time points for output. If None, use n_samples
+        n_freq_bins : int or None
+            Number of frequency bins. If None, use n_samples
+        window_type : bool
+            Optional window 'hann'. If False, use rectangular (no window)
+        
+        Returns:
+        --------
+        wvd : ndarray, shape (n_freq_bins, n_points)
+            Wigner-Ville distribution (time-frequency plane)
+        freqs : ndarray
+            Frequency values (Hz)
+        times : ndarray
+            Time values (s)
+        """
+        if n_points is None:
+            n_points = self.N//2
+        
+        if n_freq_bins is None:
+            n_freq_bins = self.N
+        
+        # Time points to compute WVD
+        time_indices = np.linspace(0, self.N - 1, n_points, dtype=int)
+        
+        # Frequency grid
+        freqs = np.fft.fftfreq(n_freq_bins, 1/self.fs)
+        times = time_indices / self.fs
+        
+        # Initialize WVD matrix
+        wvd = np.zeros((n_freq_bins, n_points), dtype=np.float64)
+        
+        analytic_signal, _, _ = self.get_hilbert()
+        # autocorrelation_map = np.zeros((n_freq_bins, n_points), dtype=np.float64)
+        
+        print('Calculating Wigner Ville distribution...')
+        # Compute WVD for each time point
+        for t_idx, n in tqdm(enumerate(time_indices)):
+            # Kernel: time-domain autocorrelation
+            # Maximum lag: min(n, n_samples-1-n) to stay within signal bounds
+            max_lag = min(n, self.N - 1 - n)
             
+            # Skip the first iteration
+            if max_lag<1:
+                continue
+                        
+            # Lags from -max_lag to +max_lag
+            lags = np.arange(-max_lag, max_lag + 1)
+            kernel = np.zeros(len(lags), dtype=np.complex128)
+            
+            for i, lag in enumerate(lags):
+                n_plus = n + lag//2
+                n_minus = n - lag//2
+                
+                if 0 <= n_plus < self.N and 0 <= n_minus < self.N:
+                    # Kernel: x[n+lag] * conj(x[n-lag])
+                    kernel[i] =  (
+                        analytic_signal[n_plus] * 
+                        np.conj(analytic_signal[n_minus])
+                    )
+            
+            # Zero-pad for FFT
+            kernel_padded = np.zeros(n_freq_bins, dtype=np.complex128)
+            
+            kernel_padded[:min(len(kernel),len(kernel_padded))] = kernel[:min(len(kernel),len(kernel_padded))]
+            
+            # Apply optional window to kernel
+            if win_filt:
+                w = sp.signal.windows.hann(kernel)
+                # w_padded = np.zeros(n_freq_bins)
+                # w_padded[start_idx:end_idx] = w[kernel_start:kernel_end]
+                # kernel_padded *= w_padded
+            
+            # FFT to get frequency domain
+            # autocorrelation_map[:,t_idx] = kernel_padded
+            wvd_col = np.abs(np.fft.fft(kernel_padded))/(n_points*n_freq_bins)
+            wvd[:, t_idx] = wvd_col
+        
+        # N = self.N
+        # bins = np.arange(N)
+        # indices = sp.linalg.hankel(bins, bins + N - (N % 2))
+
+        # padded_x = np.pad(analytic_signal, (N, N), 'constant')
+        # wigner_integrand = \
+        #     padded_x[indices+N] * np.conjugate(padded_x[indices[::, ::-1]])
+
+        # wvd = np.real(np.fft.fft(wigner_integrand, axis=1)).T
+        # times = self.t
+        # freqs = np.linspace(0,1,N)*self.fs/2
+        # Normalize
+        # if np.max(wvd) > 0:
+        #     wvd = wvd / np.max(wvd)
+        
+        return wvd, freqs, times
+         
     def get_stat_history(self, winsize:int, olap:int = 0, idx_type = 'rms'):
         """
         Compute a statistical index over a moving window.
@@ -866,6 +969,7 @@ class SingleChanSignal:
         n_bins:int = None, 
         fl : int = None, 
         fu : int = None, 
+        xlims:list = None,
         ylims:list = None
         ):
         """
@@ -893,12 +997,12 @@ class SingleChanSignal:
         """
         if n_bins and fl and fu: 
             fvec, spectral_kurtosis = get_banded_spectral_kurtosis(self.x,self.dt,n_bins, fl, fu)
-        elif Nfft:
-            fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = Nfft, noverlap = Nfft//4)
+            print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs:.1f} Hz')
         else: 
-            fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x,Nfft = 2**10, noverlap = 2**8)
+            if Nfft is None: Nfft = 2**10
+            fvec, spectral_kurtosis = get_welch_spectral_kurtosis(self.x, Nfft = Nfft, noverlap = Nfft//4)
+            print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs:.1f} Hz with Nfft = {Nfft:.0f}')
             
-        print(f'Plotting spectral kurtosis from {fvec[0]:.1f} Hz to {fvec[-1]*self.fs:.1f} Hz')
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 4))
         s_kur = self.central_moments['kurtosis']
@@ -914,6 +1018,8 @@ class SingleChanSignal:
         ax.set_ylim([0,1.5*np.max(spectral_kurtosis)])
         if ylims is not None:
             ax.set_ylim(ylims)
+        if xlims is not None:
+            ax.set_xlim(xlims)
         plt.show(block=False)
         return ax
     
@@ -1130,6 +1236,8 @@ class SingleChanSignal:
         self, 
         fig = None, 
         ax = None, 
+        nperseg:int = 2**10,
+        hop:int = 2**5,
         flims:list = None
         ): #!WIP
         """
@@ -1151,8 +1259,6 @@ class SingleChanSignal:
         """
         _, absolute_envelope, _ = self.get_hilbert()
         se = absolute_envelope**2
-        nperseg:int = 2**10
-        hop = 2**5
         w = sp.signal.windows.hann(nperseg)  
         SFT = sp.signal.ShortTimeFFT(w, hop=hop, fs=self.fs, mfft=nperseg*2, scale_to='magnitude')
         Sx = SFT.stft(se)
@@ -1175,6 +1281,38 @@ class SingleChanSignal:
         plt.show(block=False)
 
         return ax
+    
+    def plot_wigner_ville(self, n_points=None, n_freq_bins=None, win_filt:bool = False, freq_range:list|tuple = None, time_range:list|tuple = None): #!WIP
+        
+        wvd, freqs, times = self.get_wigner_ville(n_points, n_freq_bins, win_filt)
+        
+                # Set frequency/time limits
+        if freq_range is None:
+            freq_range = (0, self.fs / 2)
+        if time_range is None:
+            time_range = (0, self.N / self.fs)
+        
+        # Filter to ranges
+        freq_mask = (freqs >= freq_range[0]) & (freqs <= freq_range[1])
+        time_mask = (times>= time_range[0]) & (times <= time_range[1])
+        
+        wvd_plot = wvd[freq_mask, :][:, time_mask]
+        
+        freqs_plot = freqs[freq_mask]
+        times_plot = times[time_mask]
+        # Create figure
+        _, axes = plt.subplots(figsize=(10, 4), tight_layout=True)
+        
+        # Plot 1: Standard WVD
+        im1 = axes.contourf(
+            times_plot, freqs_plot, wvd_plot,
+            levels=20, cmap='jet'
+        )
+        axes.set_xlabel('Time (s)')
+        axes.set_ylabel('Frequency (Hz)')
+        axes.set_title('Wigner-Ville Distribution')
+        plt.colorbar(im1,label=f"Magnitude [({self.unit})$^2$]", ax=axes)
+        plt.show(block = True)
           
     def plot_scalogram(self, ax = None, wavetype = 'morl', **kwargs):
         """
