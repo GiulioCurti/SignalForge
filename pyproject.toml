@@ -1,3 +1,39 @@
 [build-system]
-requires = ["setuptools>=40.8.0,<80.0", "wheel"]
+requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "SignalForge"
+version = "1.0.0"
+description = "A comprehensive Python package for generating and analyzing non-Gaussian and non-stationary signals."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    {name = "Giulio Curti", email = "giulio.curti@dottorandi.unipg.it"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = [
+    "numpy>=2.0",
+    "scipy",
+    "matplotlib>=3.10",
+    "tqdm",
+    "PyWavelets",
+    "pyNNST",
+    "statsmodels",
+]
+
+[project.urls]
+Homepage = "https://github.com/GiulioCurti/SignalForge"
+Documentation = "https://signalforge.readthedocs.io/"
+Repository = "https://github.com/GiulioCurti/SignalForge.git"
+Bug-Tracker = "https://github.com/GiulioCurti/SignalForge/issues"
+
+[tool.setuptools]
+packages = ["SignalForge"]

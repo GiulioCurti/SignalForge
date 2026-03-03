@@ -9,6 +9,7 @@ from SignalForge.nonstationary_nongaussian import (
     get_frequency_modulation,
 )
 from types import SimpleNamespace
+import matplotlib.pyplot as plt
 
 
 @pytest.fixture
@@ -68,3 +69,16 @@ def test_frequency_modulation_output_shape(sample_psd_data):
     assert isinstance(sig.x, np.ndarray)
     assert len(sig.x) > 0
     assert "carrier" in sig.carrier
+
+def test_plot_carrier_runs(sample_psd_data):
+    fpsd, psd, T, fs = sample_psd_data
+    # Create a NonStationaryNonGaussian instance that has a carrier
+    params = {'input_kurtosis': 6}
+    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='beta_am', params=params, seed=42)
+    
+    # Test that the plot_carrier method runs without raising an exception
+    try:
+        ax = sig.plot_carrier()
+        assert ax is not None and isinstance(ax, plt.Axes)
+    finally:
+        plt.close('all') # Close plot to prevent it from showing up and consuming resources

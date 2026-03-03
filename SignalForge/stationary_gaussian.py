@@ -46,6 +46,32 @@ class StationaryGaussian(SingleChanSignal):
         seed: int = None,
         interp: str = "lin"
     ):
+        """
+        Initializes a StationaryGaussian signal generator.
+
+        Parameters
+        ----------
+        fpsd : np.ndarray
+            Frequency vector of the power spectral density.
+        psd : np.ndarray
+            Power spectral density values.
+        T : float
+            Duration of the signal (in seconds).
+        fs : float, optional
+            Wanted sampling frequency. If None -> 2*fpsd[-1].
+        dfpsd : float, optional
+            Frequency discretization for PSD storage. Default is 0.5.
+        name : str, optional
+            Name of the signal (for plots). Default is "".
+        var : str, optional
+            Variable name (for plots). Default is "x".
+        unit : str, optional
+            Unit of measurement of the signal (for plots). Default is '$m/s^2$'.
+        seed : int, optional
+            Seed for the random generator (for reproducibility). Default is None.
+        interp : str, optional
+            Interpolation method for PSD ("lin" or "log"). Default is "lin".
+        """
 
         # Check input dimensions
         if len(fpsd) != len(psd):

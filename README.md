@@ -14,6 +14,14 @@ The package is published in PiPy. To install it:
 ```bash
 pip install signalforge
 ```
+or you can clone it from GitHub
+```bash
+git clone https://github.com/GiulioCurti/SignalForge.git
+```
+and locally install it from inside the folder SignalForge
+```bash
+pip install -e .
+```
 
 Example code on how to generate a Stationary Gaussian Signal
 ------------------------------------------------------------

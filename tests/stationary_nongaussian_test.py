@@ -23,6 +23,21 @@ def sample_psd_data():
     fs = 200
     return fpsd, psd, T, fs
 
+@pytest.fixture
+def sample_psd():
+    fpsd = np.array([0.0, 10.0, 20.0, 30.0, 40.0, 50.0])
+    psd = np.array([0.0, 0.1, 0.5, 0.3, 0.1, 0.0])
+    return fpsd, psd
+
+@pytest.fixture
+def fs():
+    return 100 # A sample fs
+
+@pytest.fixture
+def gaussian_signal():
+    np.random.seed(0)
+    return np.random.randn(1000)  # Large enough for good statistics
+
 def test_initialization(sample_psd_data):
     fpsd, psd, T, fs = sample_psd_data
     kurtosis = 6
@@ -72,10 +87,6 @@ def test_other_methods_run(sample_psd_data):
         assert sg.x.shape[0] == int(sg.T * sg.fs)
         assert abs(output_kurtosis - kurtosis_target) < 2
 
-@pytest.fixture
-def gaussian_signal():
-    np.random.seed(0)
-    return np.random.randn(1000)  # Large enough for good statistics
 
 def test_get_winterstein(gaussian_signal):
     target_skewness = 0.5
@@ -83,57 +94,85 @@ def test_get_winterstein(gaussian_signal):
     out, _ = get_winterstein(gaussian_signal, input_skewness=target_skewness, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # assert abs(stats.kurtosis(out) + 3 - target_kurtosis) < 2
 
 def test_get_cubic_polinomial(gaussian_signal):
     target_kurtosis = 7
     out, _ = get_cubic_polinomial(gaussian_signal, input_kurtosis=target_kurtosis, input_skewness=0)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # assert abs(stats.kurtosis(out) + 3 - target_kurtosis) < 2
 
 def test_get_zheng(gaussian_signal):
     target_kurtosis = 7
     out, _ = get_zheng(gaussian_signal, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # assert abs(stats.kurtosis(out) + 3 - target_kurtosis) < 2
 
 def test_get_sarkani(gaussian_signal):
     target_kurtosis = 7
     out, _ = get_sarkani(gaussian_signal, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # assert abs(stats.kurtosis(out) + 3 - target_kurtosis) < 2
 
 def test_get_zmnl(gaussian_signal):
     target_kurtosis = 7
-    fs = 100
-    out, _ = get_zmnl(gaussian_signal, fs=fs, input_kurtosis=target_kurtosis)
+    fs_val = 100 # Renamed from 'fs' to avoid fixture conflict if 'fs' fixture is later defined globally
+    out, _ = get_zmnl(gaussian_signal, fs=fs_val, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # assert abs(stats.kurtosis(out) + 3 - target_kurtosis) < 2
 
-@pytest.mark.xfail(reason="Steinwolf method flagged WIP in the code comments")
-def test_get_steinwolf(gaussian_signal, fs):
+def test_get_steinwolf_kurtosis(gaussian_signal, fs):
     target_kurtosis = 7
     out, _ = get_steinwolf(gaussian_signal, fs=fs, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
-    # Note: This test is expected to fail currently
+    output_kurtosis = stats.kurtosis(out) + 3 # +3 to convert from Fisher's to Pearson's
+    assert abs(output_kurtosis - target_kurtosis) < 2.0 # Allow a reasonable tolerance
 
-@pytest.mark.skip(reason="Smallwood method marked NOT WORKING in the comments")
-def test_get_smallwood(sample_psd):
+def test_get_smallwood_kurtosis(sample_psd):
     fpsd, psd = sample_psd
     T = 2.0
     target_kurtosis = 7
     out, _ = get_smallwood(fpsd, psd, T, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
+    # Assert that the output kurtosis is close to the target, allowing for some tolerance
+    output_kurtosis = stats.kurtosis(out) + 3 # +3 to convert from Fisher's to Pearson's
+    assert abs(output_kurtosis - target_kurtosis) < 2.0 # Allow a reasonable tolerance
 
-@pytest.mark.skip(reason="Vanbaren method marked unstable and verbose optimization")
-def test_get_vanbaren(sample_psd):
+def test_get_vanbaren_kurtosis(sample_psd):
     fpsd, psd = sample_psd
     T = 2.0
     target_kurtosis = 7
     out, _ = get_vanbaren(fpsd, psd, T, input_kurtosis=target_kurtosis)
     assert isinstance(out, np.ndarray)
+    # Assert that the output kurtosis is close to the target, allowing for some tolerance
+    output_kurtosis = stats.kurtosis(out) + 3 # +3 to convert from Fisher's to Pearson's
+    assert abs(output_kurtosis - target_kurtosis) < 2.0 # Allow a reasonable tolerance
+
+def test_banded_nongaussian_timehistory(sample_psd_data):
+    fpsd, psd, T, fs = sample_psd_data
+    # Define banded kurtosis targets
+    kurtosis_targets = [5.0, 7.0, 5.0] # Example targets for 3 bands
+    flims = [1, 20] # Example frequency limits
+    skewness_target = 0.0 # For simplicity
+    
+    # Initialize class with banded kurtosis
+    sg = StationaryNonGaussian(
+        fpsd, psd, T, 
+        kurtosis=np.array(kurtosis_targets), # Pass as numpy array
+        flims=flims, 
+        fs=fs, 
+        skewness=skewness_target, 
+        method='winter', # Use a known working method
+        seed=42
+    )
+
+    assert isinstance(sg.x, np.ndarray)
+    assert len(sg.x) == int(T * fs) # Check output signal length
+
+    # Further assertions could involve checking kurtosis of filtered bands,
+    # but that would involve re-implementing significant logic or exposing internal state.
+    # For now, a basic check that the overall signal is non-Gaussian is a start.
+    overall_kurtosis = stats.kurtosis(sg.x) + 3
+    # Expect overall kurtosis to be higher than 3 (Gaussian) if individual bands are non-Gaussian
+    assert overall_kurtosis > 3.0
+    # A more rigorous test would check kurtosis per band after filtering, but this is a start.

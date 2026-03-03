@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from SignalForge.single_chan_signal import *
 from numpy.testing import assert_allclose, assert_almost_equal
+import pywt
 
 @pytest.fixture
 def sample_signal():
@@ -66,6 +67,13 @@ def test_nonstat_index(sample_signal):
     sample_signal.get_nonstat_index()
     sample_signal.get_nonstat_index(idx_type='adf')
     sample_signal.get_nonstat_index(idx_type='kpss')
+
+def test_get_wavelet_transform_output_shape(sample_signal):
+    data, f = sample_signal.get_wavelet_transform()
+    assert isinstance(data, np.ndarray)
+    assert isinstance(f, np.ndarray)
+    assert data.shape[1] == len(sample_signal.x)
+    assert len(f) == data.shape[0] # Number of scales == number of frequency bins
 
 # You can test plotting functions to make sure they run without exceptions
 def test_plot_methods_run(sample_signal):

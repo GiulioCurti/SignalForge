@@ -41,6 +41,6 @@ def test_time_domain_signal_properties(sample_psd_data):
     assert abs(np.mean(sg.x)) < 0.1
 
     # Check the RMS power is roughly consistent with the PSD area
-    expected_power = np.trapz(psd, fpsd)
+    expected_power = np.trapezoid(psd, fpsd)
     actual_power = np.var(sg.x)
     assert np.isclose(actual_power, expected_power, rtol=0.01)  # loose tolerance for randomness

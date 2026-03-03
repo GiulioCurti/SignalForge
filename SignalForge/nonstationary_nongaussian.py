@@ -1,7 +1,4 @@
-import numpy as np
-import scipy as sp
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 from .utils import *
 from .single_chan_signal import SingleChanSignal
@@ -267,12 +264,48 @@ def get_trapp_amplitude_modulation(
     A. Trapp, M. J. Makua, e P. Wolfsteiner, «Fatigue assessment of amplitude-modulated non-stationary random vibration loading», Procedia Struct. Integr., vol. 17, pp. 379–386, 2019, doi: 10.1016/j.prostr.2019.08.050.
     """
     def get_trapp_carrier(p, delta_m, gaussian_carier): 
-        """Generate amplitude modulation carrier based on power-law transformation."""  
+        """
+        Generate amplitude modulation carrier based on power-law transformation.
+
+        Parameters
+        ----------
+        p : float
+            Exponent for the power-law transformation.
+        delta_m : float
+            Offset for the amplitude modulation.
+        gaussian_carier : np.ndarray
+            The Gaussian carrier signal.
+
+        Returns
+        -------
+        np.ndarray
+            The transformed Rayleigh carrier signal.
+        """  
         ray_carrier = np.abs(gaussian_carier)**p+delta_m
         return ray_carrier
     
     def trapp_am_opt_fun(params, gauss_carrier, input_kurtosis):
-        """Optimization objective: match output signal kurtosis and reduce skew."""
+        """
+        Optimization objective function for Trapp amplitude modulation.
+
+        This function calculates the absolute difference between the transformed
+        signal's kurtosis and skewness and the target values.
+
+        Parameters
+        ----------
+        params : list
+            Parameters for the `get_trapp_carrier` function.
+        gauss_carrier : np.ndarray
+            The Gaussian carrier signal.
+        input_kurtosis : float
+            The target kurtosis.
+
+        Returns
+        -------
+        float
+            The absolute difference between the transformed signal's kurtosis and skewness
+            and the target values.
+        """
         carrier = get_trapp_carrier(*params, gaussian_carier=gauss_carrier)
         nonstat_sign = _add_am_carrier(gauss_signal, carrier)
         transformed_kurtosis = sp.stats.kurtosis(nonstat_sign) + 3
@@ -386,19 +419,49 @@ class NonStationaryNonGaussian(SingleChanSignal):
             PSD interpolation method: 'lin' or 'log'. Default is 'lin'.
     """
     def __init__(
-        self, 
-        fpsd:np.ndarray, 
-        psd:np.ndarray, 
-        T:float, 
+        self,
+        fpsd:np.ndarray,
+        psd:np.ndarray,
+        T:float,
         fs:float = None,
-        dfpsd:float = 0.5, 
-        method:str = 'beta_am', 
-        params = None, 
-        name:str="", 
-        var:str='x', 
-        unit:str="$m/s^2$", 
-        seed:int=None, 
-        interp:str ='lin'):        
+        dfpsd:float = 0.5,
+        method:str = 'beta_am',
+        params = None,
+        name:str="",
+        var:str='x',
+        unit:str="$m/s^2$",
+        seed:int=None,
+        interp:str ='lin'):
+        """
+        Initializes a NonStationaryNonGaussian signal generator.
+
+        Parameters
+        ----------
+            fpsd : np.ndarray
+                Frequency vector for the input PSD.
+            psd : np.ndarray
+                Power spectral density values.
+            T : float
+                Total duration of the signal [s].
+            fs : float, optional
+                Wanted sampling frequency. If None -> 2*fpsd[-1].
+            dfpsd : float, optional
+                Frequency resolution [Hz]. Default is 0.5.
+            method : str, optional
+                Modulation method: 'beta_am', 'ray_am', 'trapp_am', or 'fm'. Default is 'beta_am'.
+            params : dict, optional
+                Dictionary of parameters for the modulation method.
+            name : str, optional
+                Name of the signal.
+            var : str, optional
+                Variable symbol, e.g., 'x'.
+            unit : str, optional
+                Signal unit. Default is '$m/s^2$'.
+            seed : int, optional
+                Random seed for reproducibility.
+            interp : str, optional
+                PSD interpolation method: 'lin' or 'log'. Default is 'lin'.
+        """        
         
         method = method.lower()
         interp = interp.lower()
