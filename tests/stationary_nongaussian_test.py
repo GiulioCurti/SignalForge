@@ -6,7 +6,7 @@ import scipy.stats as stats
 from SignalForge.stationary_nongaussian import StationaryNonGaussian  # Update import path
 from SignalForge.stationary_nongaussian import (
     get_winterstein,
-    get_cubic_polinomial,
+    get_cubic_polynomial,
     get_zheng,
     get_sarkani,
     get_zmnl,
@@ -95,9 +95,9 @@ def test_get_winterstein(gaussian_signal):
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
 
-def test_get_cubic_polinomial(gaussian_signal):
+def test_get_cubic_polynomial(gaussian_signal):
     target_kurtosis = 7
-    out, _ = get_cubic_polinomial(gaussian_signal, input_kurtosis=target_kurtosis, input_skewness=0)
+    out, _ = get_cubic_polynomial(gaussian_signal, input_kurtosis=target_kurtosis, input_skewness=0)
     assert isinstance(out, np.ndarray)
     assert len(out) == len(gaussian_signal)
 
