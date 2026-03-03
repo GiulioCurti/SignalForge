@@ -92,8 +92,8 @@ def test_get_stat_history():
 
 def test_get_nnst_index():
     stat_signal, nonstat_signal = get_signals()
-    test_stat = get_nnst_index(stat_signal, nperseg=100)
-    test_nonstat = get_nnst_index(nonstat_signal, nperseg=100)
+    test_stat = get_nnst_index(stat_signal, nperseg=50)
+    test_nonstat = get_nnst_index(nonstat_signal, nperseg=50)
     assert test_stat['outcome']=='Stationary'
     assert test_nonstat['outcome']=='Non-stationary'
 

@@ -172,20 +172,20 @@ def get_cubic_polynomial(signal: np.ndarray, input_kurtosis: float, input_skewne
 
         pdf_y = pdf_x / dydx
 
-        # Sort z for trapz integration (transform may reorder grid)
+        # Sort z for trapezoid integration (transform may reorder grid)
         sort_idx = np.argsort(z)
         z_s = z[sort_idx]
         pdf_y_s = pdf_y[sort_idx]
 
-        norm = np.trapz(pdf_y_s, z_s)
+        norm = np.trapezoid(pdf_y_s, z_s)
         if norm <= 0:
             return 1e6
         pdf_y_s /= norm
 
-        mean_y   = np.trapz(pdf_y_s * z_s, z_s)
-        var_y    = np.trapz(pdf_y_s * (z_s - mean_y)**2, z_s)
-        skew_y   = np.trapz(pdf_y_s * (z_s - mean_y)**3, z_s) / var_y**(3/2)
-        kurt_y   = np.trapz(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2 - 3  # excess kurtosis
+        mean_y   = np.trapezoid(pdf_y_s * z_s, z_s)
+        var_y    = np.trapezoid(pdf_y_s * (z_s - mean_y)**2, z_s)
+        skew_y   = np.trapezoid(pdf_y_s * (z_s - mean_y)**3, z_s) / var_y**(3/2)
+        kurt_y   = np.trapezoid(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2 - 3  # excess kurtosis
 
         if np.allclose(input_kurtosis,3):
             obj_val = np.abs(skew_y - input_skewness)
@@ -291,18 +291,18 @@ def get_zheng(signal: np.ndarray, input_kurtosis: float, input_skewness: float =
         z_s = z[sort_idx]
         pdf_y_s = pdf_y[sort_idx]
 
-        norm = np.trapz(pdf_y_s, z_s)
+        norm = np.trapezoid(pdf_y_s, z_s)
         if norm <= 0:
             return 1e6
         pdf_y_s /= norm
 
-        mean_y = np.trapz(pdf_y_s * z_s, z_s)
-        var_y  = np.trapz(pdf_y_s * (z_s - mean_y)**2, z_s)
+        mean_y = np.trapezoid(pdf_y_s * z_s, z_s)
+        var_y  = np.trapezoid(pdf_y_s * (z_s - mean_y)**2, z_s)
         if var_y <= 0:
             return 1e6
 
-        skew_y = np.trapz(pdf_y_s * (z_s - mean_y)**3, z_s) / var_y**(3/2)
-        kurt_y = np.trapz(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2 - 3  # excess kurtosis
+        skew_y = np.trapezoid(pdf_y_s * (z_s - mean_y)**3, z_s) / var_y**(3/2)
+        kurt_y = np.trapezoid(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2 - 3  # excess kurtosis
 
         if np.allclose(input_kurtosis,3):
             obj_val = np.abs(skew_y - input_skewness)
@@ -417,7 +417,7 @@ def get_sarkani(signal:np.ndarray, input_kurtosis:float, input_skewness:float = 
         # zt = sarkani_transform(x, beta, n)
         # time_kurt = sp.stats.kurtosis(zt) + 3
 
-        transformed_kurtosis = np.trapz(pdf_x*z**4,grid)/np.trapz(pdf_x*z**2,grid)**2
+        transformed_kurtosis = np.trapezoid(pdf_x*z**4,grid)/np.trapezoid(pdf_x*z**2,grid)**2
         obj_val = np.abs(transformed_kurtosis - input_kurtosis)
         return obj_val
     
@@ -855,11 +855,12 @@ def get_smallwood(
     fs  = 2.0 * fpsd[-1]
     dt  = 1.0 / fs
     N   = round(T * fs)
+    fpsd, psd = log_interp_psd(fpsd, psd, N//2, fs)
     K4  = input_kurtosis
     S3  = input_skewness if input_skewness is not None else 0.0
 
     # Target RMS from PSD
-    inp_rms = np.sqrt(np.trapz(psd, fpsd))
+    inp_rms = np.sqrt(np.trapezoid(psd, fpsd))
     E_x2    = inp_rms ** 2   # target variance (signal is zero-mean)
 
     # --- Impulse response h(t) from PSD, Eq. (8) ---
@@ -1042,7 +1043,7 @@ def get_vanbaren(
 
     fs = 2 * fpsd[-1]
     N = round(T * fs)
-    inp_rms = np.sqrt(np.trapz(psd, fpsd))
+    inp_rms = np.sqrt(np.trapezoid(psd, fpsd))
     h_t = get_psd_impulse_response(fpsd, psd, N // 2)
 
     # --- Bypass optimization ---
