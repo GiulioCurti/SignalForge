@@ -34,7 +34,8 @@ class SingleChanSignal:
         name:str = "", 
         var:str = 'x', 
         unit:str = "$m/s^2$",
-        signal_type:str = 'User provided signal'
+        signal_type:str = 'User provided signal',
+        quiet:bool = False,
     ):
         """
         Initializes a SingleChanSignal object.
@@ -55,6 +56,8 @@ class SingleChanSignal:
             Unit of measure of the signal (used for plots). Default is '$m/s^2$'.
         signal_type : str, optional
             Description of the signal type. Default is 'User provided signal'.
+        quiet : bool, optional
+            Suppresses the print of stats and initialization info. Default is False 
         """
         
         self.name = name
@@ -76,7 +79,8 @@ class SingleChanSignal:
         self.spectral_moments = self._get_spectral_moments()
         self.ns_index = {}
         print('Class correctly initialized')
-        print(self)
+        if quiet is False:
+            print(self)
         
     def __str__(self):
         """
@@ -256,7 +260,7 @@ class SingleChanSignal:
             - 'vm' : float
                 Mean frequency.
             - 'xm' : float
-                Irregularity factor.
+                Ratio between the mean frequency and the peak rate.
             - 'alpha1', 'alpha2', 'alpha075', 'alphadx' : float
                 Various spectral width parameters.
         
@@ -374,7 +378,7 @@ class SingleChanSignal:
         """ 
         w = sp.signal.windows.hann(nperseg)  
         SFT = sp.signal.ShortTimeFFT(w, hop=hop, fs=self.fs, mfft=nperseg*2, scale_to='psd')
-        Sxx = SFT.stft(self.x)
+        Sxx = abs(SFT.stft(self.x))**2
         if nargout>1:
             return Sxx, SFT    
         return Sxx  
@@ -629,7 +633,7 @@ class SingleChanSignal:
         ax.set_xlabel("Time [s]")
         ax.set_ylabel(f"Amplitude [{self.unit}]")
         ax.legend()   
-        ax.grid(True,which = 'both')
+        #ax.grid(True,which = 'both')
         ax.minorticks_on()   
         ax.set_title(f'Timehistory {self.name}')
         if xlims is not None:
@@ -683,8 +687,6 @@ class SingleChanSignal:
         ax.set_xlabel(f"Amplitude [{self.unit}]")
         ax.set_ylabel(f"$PDF$ [-]")
         ax.legend()   
-        ax.grid(True,which = 'both')
-        ax.minorticks_on()   
         ax.set_title(f'Probability Density Function {self.name}')
         ax.set_ylim([np.min(pdf_gauss), 1.1*np.max([np.max(pdf_gauss), np.max(pdf)])])
         if xlims is not None:
@@ -737,8 +739,6 @@ class SingleChanSignal:
             ax0.plot(self.f_fft_os, np.abs(self.fft_os), 'k', label=label)
         ax0.set_ylabel(f"$FT_{{{self.var}}}$ [{self.unit}]")
         ax0.legend()   
-        ax0.grid(True, which='both')
-        ax0.minorticks_on()   
         ax0.set_title(f'Fourier transform {self.name}')
         
         if is_array:
@@ -747,8 +747,6 @@ class SingleChanSignal:
             else:
                 ax_array[1].plot(self.f_fft_os, np.angle(self.fft_os), 'k', label=label)
             ax_array[1].set_ylabel(f"$\\phi_{{{self.var}}}$ [rad]")
-            ax_array[1].grid(True, which='both')
-            ax_array[1].minorticks_on()
             ax_array[1].set_xlabel("Frequency [Hz]")
             ax0.sharex(ax_array[1])
         else:
@@ -798,9 +796,7 @@ class SingleChanSignal:
         ax.plot(self.fpsd,self.psd,'k',label=label)
         ax.set_xlabel("Frequency [Hz]")
         ax.set_ylabel(f"$G_{{{self.var}{self.var}}}$ [({self.unit})$^2$/Hz]")
-        ax.legend()   
-        ax.grid(True,which = 'both')
-        ax.minorticks_on()        
+        ax.legend()        
         ax.set_title(f'Power Spectral Density {self.name}')
         if xlims is not None:
             ax.set_xlim(xlims)
@@ -818,8 +814,7 @@ class SingleChanSignal:
     
     def plot_spectrogram(
         self,
-        ax = None, 
-        window:tuple = ('tukey', 1), 
+        ax = None,  
         nperseg:int = 2**10, 
         ylims:list = None, 
         clims:list = None
@@ -846,20 +841,27 @@ class SingleChanSignal:
             The axes with the plotted spectrogram.
         """
         print(f'Calculating spectrogram')
-        f, t, Sxx = sp.signal.spectrogram(self.x, fs = self.fs, window = window, nperseg = nperseg)       
+        Sxx, SFT = self.get_spectrogram(nperseg = nperseg, hop = round(0.1*nperseg), nargout=2)     
         print(f'Plotting spectrogram')
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 4), tight_layout=True)
-        spec = ax.pcolormesh(t, f, Sxx, vmin=Sxx.min(), vmax=Sxx.max(), shading='auto')
-        ax.set_ylabel('Frequency [Hz]')
-        ax.set_xlabel('Time [sec]')
+
+        t_lo, t_hi = SFT.extent(self.N)[:2]  # time range of plot
+        
+        im1 = ax.imshow(Sxx, origin='lower', aspect='auto',
+                        extent=SFT.extent(self.N))
+        ax.set(xlabel=f"Time [s] ({SFT.p_num(self.N)} slices, " +
+                    rf"$\Delta t = {SFT.delta_t:.3f}\,$s)",
+                ylabel=f"Frequency [Hz] ({SFT.f_pts} bins, " +
+                    rf"$\Delta f = {SFT.delta_f:.3f}\,$Hz)",
+                xlim=(t_lo, t_hi))
+        ax.set_title(rf"Spectrogram {self.name}")
+        
         ax.set_title('Spectrogram')
-        cbar = fig.colorbar(spec)
-        cbar.ax.set_ylabel('PSD [(m/$s^2$)$^2$/Hz]')
+        cb = fig.colorbar(im1, label=f'PSD [{self.unit})$^2$/Hz]')
+        
         if clims is not None:
-            spec.set_clim(clims)
-        else:
-            spec.set_clim(0,1.1*np.max(self.psd))
+            cb.set_clim(clims)
         if ylims is not None:
             ax.set_ylim(ylims)
         plt.show(block=False)
@@ -966,7 +968,7 @@ class SingleChanSignal:
         ax.set_xlabel("frequency [Hz]")
         ax.set_ylabel(f"$SK_{self.var}$ [-]")
         ax.legend()   
-        ax.grid(True,which = 'minor')
+        #ax.grid(True,which = 'minor')
         ax.minorticks_on()  
         ax.set_title('Spectral kurtosis ' + self.name + ' (0 = Gaussian)')
         ax.set_ylim([0,1.5*np.max(spectral_kurtosis)])
@@ -1085,7 +1087,7 @@ class SingleChanSignal:
         ax.set_xlabel("Time [s]")
         ax.set_ylabel(f"Amplitude [{self.unit}]")
         ax.legend()   
-        ax.grid(True,which = 'both')
+
         ax.minorticks_on()   
         ax.set_title(f'Non-stationarity index {self.name}')
         if xlims is not None:

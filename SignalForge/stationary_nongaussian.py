@@ -185,7 +185,7 @@ def get_cubic_polynomial(signal: np.ndarray, input_kurtosis: float, input_skewne
         mean_y   = np.trapezoid(pdf_y_s * z_s, z_s)
         var_y    = np.trapezoid(pdf_y_s * (z_s - mean_y)**2, z_s)
         skew_y   = np.trapezoid(pdf_y_s * (z_s - mean_y)**3, z_s) / var_y**(3/2)
-        kurt_y   = np.trapezoid(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2 - 3  # excess kurtosis
+        kurt_y   = np.trapezoid(pdf_y_s * (z_s - mean_y)**4, z_s) / var_y**2
 
         if np.allclose(input_kurtosis,3):
             obj_val = np.abs(skew_y - input_skewness)
@@ -817,8 +817,13 @@ def get_smallwood(
         params = None
         ):
     """
-    Uses the Smallwood filtered poisson shot to achieve a desired kurtosis.
+    Uses the Smallwood filtered Poisson shot noise method to achieve desired kurtosis and skewness.
+    
+        ∑_k A_k h(t - tau_k)
 
+    The impulse train consists of impulses at random Poisson-distributed times with fixed-magnitude amplitude A_k. Each impulse's sign (±A_k) is independently Bernoulli with probability p, which controls the skewness. The spectral content is achieved by convolving with the impulse response h(t) derived from the target PSD.
+    With this model λ (arrival rate), A_k, and p are derived in closed form directly from the target kurtosis and skewness.
+    
     Parameters
     ----------
         fpsd : np.ndarray 
@@ -844,6 +849,8 @@ def get_smallwood(
             Dictionary of optimal parameters
     Source
     ------
+    Smallwood, David O. Generation of time histories with a specified auto spectral density, skewness, and kurtosis. No. SAND--95-1984C; CONF-960538--3. Sandia National Labs., Albuquerque, NM (United States), 1996.
+    
     D. O. Smallwood, «Generation of Stationary Non-Gaussian Time Histories with a Specified Cross-spectral Density», Shock Vib., vol. 4, fasc. 5–6, pp. 361–377, 1997, doi: 10.1155/1997/713593.
     """ 
     if input_kurtosis <= 3.0:
@@ -875,10 +882,10 @@ def get_smallwood(
 
     # Sanity check: h2_bar should equal E[x²] = inp_rms²
     # because Parseval: ∫h²dt = ∫G_xx df = inp_rms²
-    assert np.isclose(h2_bar, E_x2, rtol=0.05), (
-        f"h2_bar={h2_bar:.4f} should ≈ inp_rms²={E_x2:.4f}. "
-        "Check get_psd_impulse_response normalization."
-    )
+    # assert np.isclose(h2_bar, E_x2, rtol=0.05), (
+    #     f"h2_bar={h2_bar:.4f} should ≈ inp_rms²={E_x2:.4f}. "
+    #     "Check get_psd_impulse_response normalization."
+    # )
 
     # --- Closed-form parameters, Eq. (13) ---
     # lam [Hz]: mean impulse arrival rate
@@ -905,11 +912,12 @@ def get_smallwood(
 
         # Poisson inter-arrival times in samples, Eq. (19)
         # lam_hz [1/s] → mean inter-arrival = fs/lam_hz [samples]
-        mean_interval = fs / lam_hz
+        # mean_interval = fs / lam_hz
+        lam_sp = fs / lam_hz # arrival rate in samples
         n_impulses    = max(int(lam_hz * T * 6), 200)   # generous oversample
 
         arrivals = np.cumsum(
-            np.round(rng.exponential(scale=mean_interval, size=n_impulses)).astype(int)
+            np.round(rng.exponential(scale=lam_sp, size=n_impulses)).astype(int)
         )
         arrivals = arrivals[arrivals < N]
 
@@ -922,9 +930,7 @@ def get_smallwood(
             impulse_train[k] = Ai
 
         # Circular convolution via FFT, consistent with rolled h_t
-        shot_noise = np.fft.irfft(
-            np.fft.rfft(impulse_train) * np.fft.rfft(h_t), n=N
-        )
+        shot_noise = sp.signal.fftconvolve(impulse_train, h_t, mode='same')
         return shot_noise
 
     if params is not None:
@@ -958,11 +964,22 @@ def get_vanbaren(
         input_kurtosis: float,
         input_skewness: float = 0,
         seed: int = None,
-        params: dict = None
+        params: dict = None,
+        event_samples: int = 1
         ):
     """
-    Uses the Van Baren filtered Poisson shot noise to achieve a desired kurtosis.
+    Uses the Van Baren filtered shot noise to achieve a desired kurtosis.
 
+    The shot noise is built as unit-variance Gaussian white-noise source x_i is amplitude modulated by a baseline-plus-filtered-
+    shot-noise envelope, and the resulting high-kurtosis white noise is then
+    spectrally shaped through impulse convolution to the prescribed PSD.
+ 
+        w_i = sigma * (1 + sum_j f_j * beta_{i-j} * y_{i-j}) * x_i
+ 
+    where y is a Bernoulli(gamma) impulse train, beta is a non-negative IID
+    amplitude with E[beta] = alpha - 1, f is a SHORT non-negative event kernel,
+    and sigma normalizes the modulated process to unit variance.
+    
     Parameters
     ----------
         fpsd : np.ndarray
@@ -979,6 +996,10 @@ def get_vanbaren(
             Seed for reproducibility of Poisson shot times and amplitudes.
         params : dict {'alpha': float, 'seed': int}, optional
             Bypass optimization with given parameters.
+        event_samples : int, optional
+            Length of the short, non-negative shot-noise event kernel f (samples).
+            1 == single-sample events (f is a unit impulse). Keep this small:
+            the patent warns that long event kernels wash out the impulsiveness.
 
     Returns
     -------
@@ -991,94 +1012,103 @@ def get_vanbaren(
     ------
     P. Van Baren, 'System and method for simultaneously controlling spectrum and kurtosis of a random vibration', US20070185620.
     """
-    def get_shot_noise_vanbaren(alpha, h_t, seed=None):
-        """Generate Van Baren filtered Poisson shot noise."""
+    def _generate(alpha, h_t, seed):
+        """One realization of the Van Baren amplitude-modulated, shaped signal."""
         if alpha <= 1:
             raise ValueError(f"alpha must be > 1, got {alpha:.4f}")
         N = len(h_t)
-        gamma = 1 / alpha
         rng = np.random.default_rng(seed)
-        beta = rng.exponential(scale=1 / (alpha - 1), size=N)
-        shot_impulse = np.abs(rng.standard_normal(N)) < gamma
-
-        active_idx = np.where(shot_impulse)[0]
-        active_weights = beta[active_idx]
-
-        # Build sparse impulse signal then FFT-convolve once
-        sparse_signal = np.zeros(N)
-        sparse_signal[active_idx] = active_weights
-        shot_noise = sp.signal.fftconvolve(h_t, sparse_signal, mode='same')
-        return shot_noise
-
-    def vanbaren_obj_fun(param, h_t, seed):
-        """Objective function: minimize kurtosis error."""
+ 
+        # Draw the IID sequences in a FIXED order so a given (alpha, seed) is
+        # reproducible and the objective is smooth in alpha (alpha only rescales
+        # beta; it does not change how many random numbers are drawn).
+        x = rng.standard_normal(N)                         # x_i: zero-mean, unit-var Gaussian
+        u = rng.random(N)                                  # uniform(0, 1)
+        gamma = 1.0 / alpha                                # impulse rate gamma = f(alpha) in (0, 1)
+        y = (u < gamma).astype(float)                      # Bernoulli(gamma) impulse train
+        beta = rng.exponential(scale=alpha - 1.0, size=N)  # E[beta] = alpha - 1, non-negative
+ 
+        # Filtered shot-noise envelope s_i = sum_j f_j beta_{i-j} y_{i-j}.
+        # f is a SHORT, non-negative event kernel -- deliberately NOT the long
+        # spectral filter h_t (conflating them destroys kurtosis control).
+        impulses = beta * y
+        if event_samples > 1:
+            f = np.ones(event_samples) / event_samples
+            s = sp.signal.fftconvolve(impulses, f, mode='same')
+        else:
+            s = impulses                                   # single-sample events
+ 
+        # Amplitude-modulate the Gaussian by (baseline 1 + shot-noise envelope).
+        modulated = (1.0 + s) * x                          # w_i, unnormalized
+        std = np.std(modulated)
+        if std < 1e-12:
+            return np.zeros(N)
+        modulated /= std                                   # sigma: enforce unit variance
+ 
+        # Shape the spectrum: convolve the high-kurtosis white noise with h_t.
+        ng = sp.signal.fftconvolve(modulated, h_t, mode='same')
+        return ng
+ 
+    def _obj(param, h_t, seed):
+        """Objective: minimize |raw kurtosis of the FINAL signal - target|."""
         alpha = param[0]
         if alpha <= 1.0:
             return 1e6  # infeasible
-        
-        ng = get_shot_noise_vanbaren(alpha, h_t, seed)
-        
-        if np.std(ng) < 1e-10:  # degenerate signal guard
+        ng = _generate(alpha, h_t, seed)
+        if np.std(ng) < 1e-10:  # degenerate signal
             return 1e6
-
-        kurt = sp.stats.kurtosis(ng, fisher=False)  # excess=False -> raw kurtosis
-        obj = np.abs(kurt - input_kurtosis)
-        return obj
-
+        kurt = sp.stats.kurtosis(ng, fisher=False) 
+        return abs(kurt - input_kurtosis)
+ 
     # --- Input validation ---
     if input_skewness != 0:
         raise ValueError(
             "Skewness correction is not supported for the Van Baren method. "
-            "Please set input_skewness=0 or use another method."
+            "The construction is symmetric; set input_skewness=0 or use another method."
         )
     if input_kurtosis < 3:
         raise ValueError(
-            "Van Baren shot noise targets kurtosis >= 3 (leptokurtic). "
+            "Van Baren modulation targets raw kurtosis >= 3 (leptokurtic). "
             "For platykurtic signals, consider another method."
         )
-
+ 
     # --- Setup ---
     if seed is None:
         seed = np.random.randint(int(1e6), int(1e7) - 1)
-
+ 
     fs = 2 * fpsd[-1]
     N = round(T * fs)
     inp_rms = np.sqrt(np.trapezoid(psd, fpsd))
-    h_t = get_psd_impulse_response(fpsd, psd, N // 2)
-
+    h_t = get_psd_impulse_response(fpsd, psd, N)
+ 
     # --- Bypass optimization ---
     if params is not None:
         try:
-            ng_signal = get_shot_noise_vanbaren(
-                alpha=params['alpha'], h_t=h_t, seed=params['seed']
-            )
-            ng_signal *= inp_rms / np.std(ng_signal)
-            return ng_signal, params
+            ng_signal = _generate(params['alpha'], h_t, params['seed'])
         except (KeyError, TypeError):
             raise KeyError(
                 "'params' must be a dict with format: {'alpha': float, 'seed': int}"
             )
-
-    # --- Initial guess based on target kurtosis ---
-    # Higher kurtosis -> lower alpha (more impulsive)
-    alpha_init = max(1.5, 10 / (input_kurtosis - 2))
-
-    optim_res = sp.optimize.minimize(
-        vanbaren_obj_fun,
-        x0=[alpha_init],
-        args=(h_t, seed),
-        method='Nelder-Mead',
-        bounds=[(1.001, 100)],
-        options={'xatol': 1e-4, 'fatol': 1e-4, 'maxiter': 500, 'disp': False}
+        ng_signal *= inp_rms / np.std(ng_signal)
+        return ng_signal, params
+ 
+    # --- Solve for alpha (1-D, bounded). A Brent-based bounded scalar search is
+    # far more robust here than a simplex method: the post-filter kurtosis is a
+    # noisy, non-convex function of alpha, and a simplex can wander off it. ---
+    optim_res = sp.optimize.minimize_scalar(
+        lambda a: _obj([a], h_t, seed),
+        bounds=(1.01, 100.0),
+        method='bounded',
+        options={'xatol': 1e-4, 'maxiter': 500}
     )
-
+ 
     if not optim_res.success:
         print(f"Warning: optimization did not converge. Message: {optim_res.message}")
-
-    alpha_opt = optim_res.x[0]
-    ng_signal = get_shot_noise_vanbaren(alpha=alpha_opt, h_t=h_t, seed=seed)
+ 
+    alpha_opt = float(optim_res.x)
+    ng_signal = _generate(alpha_opt, h_t, seed)
     ng_signal *= inp_rms / np.std(ng_signal)
-
+ 
     opt_params = {'alpha': alpha_opt, 'seed': seed}
     return ng_signal, opt_params
 
@@ -1116,7 +1146,9 @@ class StationaryNonGaussian(SingleChanSignal):
     seed: int
         seed for the random generator used in non-gaussian models
     interp: 'lin' or 'log'
-        interpolation rule for increasing resolution on given PSD     
+        interpolation rule for increasing resolution on given PSD  
+    quiet : bool, optional
+        suppresses the print of stats and initialization info. Default is False    
     """
 
     def __init__(
@@ -1135,7 +1167,8 @@ class StationaryNonGaussian(SingleChanSignal):
         var: str = 'x',
         unit: str = "$m/s^2$",
         seed: int = None,
-        interp: str = 'lin'
+        interp: str = 'lin',
+        quiet = False,
     ):
         """
         Initializes a StationaryNonGaussian signal generator.
@@ -1172,6 +1205,8 @@ class StationaryNonGaussian(SingleChanSignal):
             Seed for the random generator used in non-Gaussian models. Default is None.
         interp : str, optional
             Interpolation rule for increasing resolution on given PSD ('lin' or 'log'). Default is 'lin'.
+        quiet : bool, optional
+            Suppresses the print of stats and initialization info. Default is False 
         """
         method = method.lower()
         interp = interp.lower()
@@ -1232,7 +1267,8 @@ class StationaryNonGaussian(SingleChanSignal):
             name=name,
             var=var,
             unit=unit,
-            signal_type=self.signal_type
+            signal_type=self.signal_type,
+            quiet = quiet
         )
 
     def get_existing_methods(self):

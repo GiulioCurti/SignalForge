@@ -1,4 +1,4 @@
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 from .single_chan_signal import *
 from .stationary_gaussian import *
 from .stationary_nongaussian import *

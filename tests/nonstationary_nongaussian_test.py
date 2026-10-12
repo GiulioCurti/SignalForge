@@ -28,7 +28,7 @@ def gaussian_signal():
 def test_class_initialization_beta_am(sample_psd_data):
     fpsd, psd, T ,fs = sample_psd_data
     params = {'input_kurtosis': 6}
-    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='beta_am', params=params, seed=42)
+    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='beta_am', params=params, seed_carr=42, seed_mod=44)
     assert isinstance(sig, NonStationaryNonGaussian)
     assert sig.x.shape[0] == int(sig.T * sig.fs)
 
@@ -41,44 +41,45 @@ def test_invalid_psd_lengths():
 def test_beta_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_beta_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, modulation = get_beta_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "modulation" in modulation
 
 def test_rayleigh_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_rayleigh_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, modulation = get_rayleigh_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "modulation" in modulation
 
 def test_trapp_amplitude_modulation_output_shape(gaussian_signal):
     T = 2.0
     input_kurtosis = 6
-    y, carrier = get_trapp_amplitude_modulation(gaussian_signal, T, input_kurtosis)
+    y, modulation = get_trapp_amplitude_modulation(gaussian_signal, T, input_kurtosis)
     assert isinstance(y, np.ndarray)
     assert len(y) == len(gaussian_signal)
-    assert "carrier" in carrier
+    assert "modulation" in modulation
 
 def test_frequency_modulation_output_shape(sample_psd_data):
     fpsd, psd, T ,fs = sample_psd_data
     modulation_function = 10+10*np.sin(np.linspace(0,2*np.pi,100))
-    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='fm', params=modulation_function, seed=42)
+    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='fm', params=modulation_function, seed_carr=42)
     assert isinstance(sig.x, np.ndarray)
     assert len(sig.x) > 0
-    assert "carrier" in sig.carrier
+    assert isinstance(sig.modulation, list)
+    assert len(sig.modulation) > 0
 
-def test_plot_carrier_runs(sample_psd_data):
+def test_plot_modulation_runs(sample_psd_data):
     fpsd, psd, T, fs = sample_psd_data
     # Create a NonStationaryNonGaussian instance that has a carrier
     params = {'input_kurtosis': 6}
-    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='beta_am', params=params, seed=42)
+    sig = NonStationaryNonGaussian(fpsd, psd, T, fs=fs, method='beta_am', params=params, seed_carr=42)
     
-    # Test that the plot_carrier method runs without raising an exception
+    # Test that the plot_modulation method runs without raising an exception
     try:
-        ax = sig.plot_carrier()
+        ax = sig.plot_modulation()
         assert ax is not None and isinstance(ax, plt.Axes)
     finally:
         plt.close('all') # Close plot to prevent it from showing up and consuming resources

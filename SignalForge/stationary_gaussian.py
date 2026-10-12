@@ -31,6 +31,8 @@ class StationaryGaussian(SingleChanSignal):
         Seed for the random generator (for reproducibility), by default None.
     interp : str, optional
         Interpolation method for PSD ("lin" or "log"), by default "lin".
+    quiet : bool, optional
+        Suppresses the print of stats and initialization info. Default is False 
     """
 
     def __init__(
@@ -44,7 +46,8 @@ class StationaryGaussian(SingleChanSignal):
         var: str = "x",
         unit: str = "$m/s^2$",
         seed: int = None,
-        interp: str = "lin"
+        interp: str = "lin",
+        quiet = False,
     ):
         """
         Initializes a StationaryGaussian signal generator.
@@ -71,6 +74,8 @@ class StationaryGaussian(SingleChanSignal):
             Seed for the random generator (for reproducibility). Default is None.
         interp : str, optional
             Interpolation method for PSD ("lin" or "log"). Default is "lin".
+        quiet : bool, optional
+            Suppresses the print of stats and initialization info. Default is False 
         """
 
         # Check input dimensions
@@ -99,7 +104,8 @@ class StationaryGaussian(SingleChanSignal):
             name=name,
             var=var,
             unit=unit,
-            signal_type=self.signal_type
+            signal_type=self.signal_type,
+            quiet = quiet
         )
 
     def _get_timehistory(
