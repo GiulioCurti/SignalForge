@@ -582,7 +582,7 @@ class NonStationaryNonGaussian(SingleChanSignal):
                 Signal unit. Default is '$m/s^2$'.
             seed_carr : int, optional
                 Random seed for the carrier for reproducibility.
-            seed_carr : int, optional
+            seed_mod : int, optional
                 Random seed for the modulation for reproducibility.
             interp : str, optional
                 PSD interpolation method: 'lin' or 'log'. Default is 'lin'.

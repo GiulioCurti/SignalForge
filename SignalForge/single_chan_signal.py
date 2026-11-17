@@ -857,8 +857,7 @@ class SingleChanSignal:
                 xlim=(t_lo, t_hi))
         ax.set_title(rf"Spectrogram {self.name}")
         
-        ax.set_title('Spectrogram')
-        cb = fig.colorbar(im1, label=f'PSD [{self.unit})$^2$/Hz]')
+        cb = ax.figure.colorbar(im1, ax=ax, label=f'PSD [({self.unit})$^2$/Hz]')
         
         if clims is not None:
             cb.set_clim(clims)

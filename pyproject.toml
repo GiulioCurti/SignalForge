@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SignalForge"
-version = "1.0.0"
+version = "1.1.0"
 description = "A comprehensive Python package for generating and analyzing non-Gaussian and non-stationary signals."
 readme = "README.md"
 requires-python = ">=3.8"
